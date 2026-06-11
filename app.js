@@ -75,7 +75,7 @@ const App = (function () {
     dom.detailCnpj = $('detail-cnpj');
     dom.detailStatusBadge = $('detail-status-badge');
     dom.detailPriorityBadge = $('detail-priority-badge');
-    dom.detailStatusRow = $('detail-status-row');
+    dom.detailRfbStatusBadge = $('detail-rfb-status-badge');
     dom.recText = $('rec-text');
     dom.internalDataFields = $('internal-data-fields');
     dom.officialDataFields = $('official-data-fields');
@@ -673,6 +673,13 @@ const App = (function () {
 
       const diasInativos = result.auditResult?.score_breakdown?.diasInativos;
       const inativoText = diasInativos >= 0 ? `${diasInativos} d` : '<span class="text-muted">—</span>';
+      
+      const situacao = result.auditResult?.dados_completos_receita?.descricao_situacao_cadastral || '';
+      let situacaoHtml = '<span class="text-muted">—</span>';
+      if (situacao) {
+        const bgClass = situacao === 'ATIVA' ? 'bg-success text-success' : 'bg-danger text-danger';
+        situacaoHtml = `<span class="badge ${bgClass} bg-opacity-10" style="font-size: 0.7rem; padding: 2px 6px;">${situacao}</span>`;
+      }
 
       html += `<tr class="${isHighlighted ? 'highlighted' : ''} ${isActive ? 'active-row' : ''}" data-index="${idx}" onclick="App.openDetailPanel(${idx})">`;
       html += `<td class="row-num">${idx + 1}</td>`;
@@ -680,6 +687,7 @@ const App = (function () {
       html += `<td class="razao-cell" title="${escapeHtml(client.razao_social)}">${escapeHtml(client.razao_social) || '<span class="text-muted">—</span>'}</td>`;
       html += `<td title="${escapeHtml(client.vendedor)}">${escapeHtml(client.vendedor) || '<span class="text-muted">—</span>'}</td>`;
       html += `<td>${inativoText}</td>`;
+      html += `<td>${situacaoHtml}</td>`;
       html += `<td>${renderStatusBadge(result.status)}</td>`;
       html += `<td>${result.priority ? renderPriorityBadge(result.priority) : '<span class="text-muted">—</span>'}</td>`;
       html += `<td>`;
@@ -836,9 +844,20 @@ const App = (function () {
 
     // Status & Priority
     if (result.status && result.status !== 'pending') {
-      dom.detailStatusRow.classList.remove('hidden');
+      dom.detailRfbStatusBadge.className = 'badge';
+      dom.detailRfbStatusBadge.innerHTML = '';
+      dom.detailRfbStatusBadge.style.display = 'none';
+      if (audit && audit.dados_completos_receita?.descricao_situacao_cadastral) {
+        const situacao = audit.dados_completos_receita.descricao_situacao_cadastral;
+        const bgClass = situacao === 'ATIVA' ? 'bg-success' : 'bg-danger';
+        dom.detailRfbStatusBadge.className = `badge ${bgClass} text-white`;
+        dom.detailRfbStatusBadge.textContent = situacao;
+        dom.detailRfbStatusBadge.style.display = 'inline-block';
+      }
+      
       dom.detailStatusBadge.className = 'status-badge ' + result.status;
       dom.detailStatusBadge.innerHTML = renderStatusBadge(result.status);
+      
       if (result.priority) {
         dom.detailPriorityBadge.className = 'priority-badge ' + result.priority.toLowerCase();
         dom.detailPriorityBadge.textContent = result.priority;
@@ -940,6 +959,8 @@ const App = (function () {
       };
 
       const extendedFields = [
+        { label: 'Situação Cadastral', value: `${official.descricao_situacao_cadastral} (em ${Utils.parseDateFlexible(official.data_situacao_cadastral)?.toLocaleDateString('pt-BR') || official.data_situacao_cadastral})` },
+        { label: 'Motivo Situação', value: official.descricao_motivo_situacao_cadastral || 'N/D' },
         { label: 'Abertura', value: Utils.parseDateFlexible(official.data_inicio_atividade)?.toLocaleDateString('pt-BR') || official.data_inicio_atividade },
         { label: 'Capital Social', value: formatCurrencyLocal(official.capital_social) },
         { label: 'Natureza Jurídica', value: official.natureza_juridica },
