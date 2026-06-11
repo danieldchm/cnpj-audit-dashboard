@@ -205,7 +205,8 @@
                 <th>Razão Social</th>
                 <th>Vendedor</th>
                 <th>Dias Inativo</th>
-                <th>Status</th>
+                <th>Situação RFB</th>
+                <th>Proc.</th>
                 <th>Prioridade</th>
                 <th class="w-24">Ação</th>
               </tr>
@@ -243,29 +244,27 @@
   <!-- Detail Panel -->
   <aside class="detail-panel" id="detail-panel">
     <div class="detail-header">
-      <div>
-        <div class="detail-title" id="detail-title">—</div>
-        <div class="detail-subtitle" id="detail-cnpj">—</div>
+      <div class="detail-title-group">
+        <h2 class="detail-title" id="detail-title">Nome da Empresa</h2>
+        <div class="detail-cnpj" id="detail-cnpj">00.000.000/0000-00</div>
+      </div>
+      <div class="detail-header-badges">
+        <span id="detail-rfb-status-badge" class="badge" style="font-weight: bold; border: 1px solid currentColor;"></span>
+        <span id="detail-status-badge" class="badge"></span>
+        <span id="detail-priority-badge" class="badge"></span>
       </div>
       <button class="detail-close" id="detail-close" title="Fechar painel">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
 
-    <!-- Status Badge in detail -->
-    <div class="detail-status-row" id="detail-status-row">
-      <span class="status-badge" id="detail-status-badge"></span>
-      <span class="priority-badge" id="detail-priority-badge"></span>
-    </div>
-
+    <div class="detail-body">
+    
     <!-- Recommendation Card -->
     <div class="recommendation-card" id="recommendation-card">
       <div class="rec-label">🤖 Recomendação da IA</div>
       <div class="rec-text" id="rec-text">—</div>
     </div>
-
-    <!-- Insights Comerciais -->
-    <div class="detail-section" id="commercial-insights-section">
       <div class="detail-section-title">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-500)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
         Insights Comerciais VPA
