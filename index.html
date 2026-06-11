@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.4">
+  <link rel="stylesheet" href="styles.css?v=1.5">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🛡️</text></svg>">
 </head>
 <body>
@@ -31,7 +31,7 @@
           <path d="M9 12l2 2 4-4"/>
         </svg>
         <h1>AuditBase</h1>
-        <span class="header-badge">Protótipo v1.0</span>
+        <span class="header-badge">Protótipo v2.0</span>
       </div>
       <div class="header-actions">
         <div class="export-dropdown" id="export-dropdown">
@@ -163,9 +163,66 @@
       </div>
     </div>
 
+    <!-- Tab Navigation -->
+    <nav class="tab-nav" id="tab-nav">
+      <button class="tab-btn active" data-tab="overview">📊 Visão Geral</button>
+      <button class="tab-btn" data-tab="carteira">📋 Carteira</button>
+      <button class="tab-btn" data-tab="intel">🧠 Inteligência</button>
+      <button class="tab-btn" data-tab="plano">🎯 Plano de Ação</button>
+    </nav>
+
     <!-- Main Content -->
     <main class="main-content" id="main-content">
 
+      <!-- ════════ ABA: VISÃO GERAL ════════ -->
+      <section class="tab-panel active" id="tab-overview">
+        <div class="empty-dash">
+          <div class="empty-icon">📊</div>
+          <div class="empty-text">A visão analítica aparece aqui após o processamento</div>
+          <div class="empty-subtext">Importe sua base e clique em “Iniciar Processamento” para ver distribuições, geografia, cohorts e inferências.</div>
+        </div>
+
+        <div class="needs-data hidden">
+          <!-- KPIs estratégicos -->
+          <div class="kpi-row">
+            <div class="kpi-card potencial">
+              <div class="kpi-label">💰 Receita Potencial (carteira ativa priorizada)</div>
+              <div class="kpi-value" id="kpi-potencial">—</div>
+              <div class="kpi-hint">Capital social somado de clientes ATIVOS com prioridade Alta/Média</div>
+            </div>
+            <div class="kpi-card quente">
+              <div class="kpi-label">🔥 Oportunidades Quentes</div>
+              <div class="kpi-value" id="kpi-quente">—</div>
+              <div class="kpi-hint">Capital dos clientes de prioridade ALTA</div>
+            </div>
+            <div class="kpi-card risco">
+              <div class="kpi-label">⚠️ Capital em Base Inativa</div>
+              <div class="kpi-value" id="kpi-risco">—</div>
+              <div class="kpi-hint">Capital preso em CNPJs baixados/suspensos/inaptos</div>
+            </div>
+          </div>
+          <div class="kpi-row secondary">
+            <div class="kpi-mini"><span id="kpi-grupos">—</span><label>Grupos de sócios</label></div>
+            <div class="kpi-mini"><span id="kpi-reabertas">—</span><label>Empresas reabertas</label></div>
+            <div class="kpi-mini"><span id="kpi-dormentes">—</span><label>Oportunidades dormentes</label></div>
+          </div>
+
+          <!-- Gráficos -->
+          <div class="chart-grid">
+            <div class="chart-card"><div class="chart-title">Situação Cadastral (RFB)</div><div class="chart-box"><canvas id="chart-situacao"></canvas></div></div>
+            <div class="chart-card"><div class="chart-title">Prioridade Comercial</div><div class="chart-box"><canvas id="chart-prioridade"></canvas></div></div>
+            <div class="chart-card"><div class="chart-title">Regime Tributário</div><div class="chart-box"><canvas id="chart-regime"></canvas></div></div>
+            <div class="chart-card"><div class="chart-title">Cohorts de Recência (tempo inativo)</div><div class="chart-box"><canvas id="chart-cohorts"></canvas></div></div>
+            <div class="chart-card"><div class="chart-title">Distribuição de Score de Oportunidade</div><div class="chart-box"><canvas id="chart-score"></canvas></div></div>
+            <div class="chart-card"><div class="chart-title">Porte das Empresas</div><div class="chart-box"><canvas id="chart-porte"></canvas></div></div>
+            <div class="chart-card"><div class="chart-title">Top UFs</div><div class="chart-box"><canvas id="chart-uf"></canvas></div></div>
+            <div class="chart-card"><div class="chart-title">Top Segmentos (CNAE)</div><div class="chart-box"><canvas id="chart-segmentos"></canvas></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════ ABA: CARTEIRA ════════ -->
+      <section class="tab-panel" id="tab-carteira">
       <!-- Table Section -->
       <section class="table-section">
         <!-- Table Controls -->
@@ -233,6 +290,72 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
           <span class="pagination-info" id="pagination-info"></span>
+        </div>
+      </section>
+      </section><!-- /tab-carteira -->
+
+      <!-- ════════ ABA: INTELIGÊNCIA ════════ -->
+      <section class="tab-panel" id="tab-intel">
+        <div class="empty-dash">
+          <div class="empty-icon">🧠</div>
+          <div class="empty-text">Inferências cruzadas aparecem aqui após o processamento</div>
+          <div class="empty-subtext">Cruzamento de sócios, redes matriz/filial, scorecard de vendedores e sinais acionáveis.</div>
+        </div>
+
+        <div class="needs-data hidden">
+          <div class="intel-block">
+            <div class="intel-head">📈 Scorecard por Vendedor</div>
+            <div class="intel-sub">Saúde da carteira, oportunidades quentes e concentração de capital por responsável.</div>
+            <div id="intel-vendedores"></div>
+          </div>
+
+          <div class="intel-block accent-red">
+            <div class="intel-head">🔁 Empresas Reabertas (sócio com CNPJ inativo + CNPJ ativo)</div>
+            <div class="intel-sub">Inferência de alto valor: o cliente “sumiu” porque baixou o CNPJ antigo e opera num novo. Atualize o cadastro e recupere a conta.</div>
+            <div id="intel-reabertas"></div>
+          </div>
+
+          <div class="intel-block">
+            <div class="intel-head">👥 Grupos Econômicos (sócios em comum)</div>
+            <div class="intel-sub">CNPJs ligados pelo mesmo sócio — oportunidade de venda cruzada e gestão de key account.</div>
+            <div id="intel-socios"></div>
+          </div>
+
+          <div class="intel-block">
+            <div class="intel-head">🏢 Redes Matriz/Filial (mesma raiz de CNPJ)</div>
+            <div class="intel-sub">Estabelecimentos do mesmo grupo — trate como conta única e negocie volume.</div>
+            <div id="intel-redes"></div>
+          </div>
+
+          <div class="intel-block">
+            <div class="intel-head">🚨 Sinais Acionáveis</div>
+            <div class="anom-grid">
+              <div class="anom-col"><div class="anom-title">💤 Oportunidades dormentes</div><ul id="anom-dormentes"></ul></div>
+              <div class="anom-col"><div class="anom-title">🆕 Recém-reativadas na RFB</div><ul id="anom-reativadas"></ul></div>
+              <div class="anom-col"><div class="anom-title">📵 Bom score, sem contato</div><ul id="anom-semcontato"></ul></div>
+              <div class="anom-col"><div class="anom-title">🏚️ Capital alto em inativa</div><ul id="anom-grandesinativas"></ul></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════ ABA: PLANO DE AÇÃO ════════ -->
+      <section class="tab-panel" id="tab-plano">
+        <div class="empty-dash">
+          <div class="empty-icon">🎯</div>
+          <div class="empty-text">A fila priorizada de contatos aparece aqui</div>
+          <div class="empty-subtext">Lista ordenada por prioridade e score, pronta para distribuir ao time comercial.</div>
+        </div>
+        <div class="needs-data hidden">
+          <div class="plano-controls">
+            <select class="filter-select" id="plano-vendedor"><option value="">Todos os vendedores</option></select>
+            <span class="plano-count" id="plano-count"></span>
+            <button class="btn btn-secondary btn-sm" id="plano-export">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Exportar fila (CSV)
+            </button>
+          </div>
+          <div id="plano-table"></div>
         </div>
       </section>
     </main>
@@ -377,10 +500,14 @@
 
   <!-- SheetJS for XLSX support (loaded from CDN) -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js for the analytics dashboard -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
-  <!-- Scripts (order matters: utils → api → app) -->
-  <script src="utils.js?v=1.4"></script>
-  <script src="api.js?v=1.4"></script>
-  <script src="app.js?v=1.4"></script>
+  <!-- Scripts (order matters: utils → insights → api → dashboard → app) -->
+  <script src="utils.js?v=1.5"></script>
+  <script src="insights.js?v=1.5"></script>
+  <script src="api.js?v=1.5"></script>
+  <script src="dashboard.js?v=1.5"></script>
+  <script src="app.js?v=1.5"></script>
 </body>
 </html>
