@@ -257,6 +257,20 @@ textarea {
   line-height: 1;
 }
 
+.brand-divider {
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  font-weight: 300;
+  margin: 0 4px;
+}
+
+.brand-subname {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
 .header-badge {
   display: inline-flex;
   align-items: center;
@@ -986,9 +1000,57 @@ td.razao-cell {
   color: var(--yellow-400);
 }
 
+.status-badge.inactive {
+  background: rgba(251, 146, 60, 0.15);
+  color: var(--orange-400, #fb923c);
+}
+
 .status-badge.error {
   background: rgba(239, 68, 68, 0.15);
   color: var(--red-400);
+}
+
+/* Threshold slider */
+.threshold-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.threshold-control strong {
+  color: var(--cyan-400);
+  min-width: 24px;
+  display: inline-block;
+  text-align: center;
+}
+.threshold-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 120px;
+  height: 4px;
+  background: var(--border-subtle);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.threshold-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cyan-400);
+  cursor: pointer;
+}
+.plano-inapta-section {
+  margin-top: 24px;
+}
+.plano-inapta-section .intel-head {
+  color: var(--purple-400, #a78bfa);
+}
+tr.below-threshold td {
+  opacity: 0.45;
 }
 
 /* --- Priority Badges --- */

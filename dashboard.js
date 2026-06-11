@@ -23,6 +23,7 @@ const Dashboard = (function () {
 
   const _charts = {};
   let _lastInsights = null;
+  let _threshold = 35; // score mínimo padrão (moderado) para exibir na fila
 
   const $ = (id) => document.getElementById(id);
   const fmtInt = (n) => Number(n || 0).toLocaleString('pt-BR');
@@ -310,7 +311,7 @@ const Dashboard = (function () {
 
   // ── Aba Plano de Ação ───────────────────────────
   function renderPlano(ins) {
-    const fila = ins.planoAcao;
+    const { fila, inaptas } = ins.planoAcao;
     const sel = $('plano-vendedor');
     if (sel) {
       const atual = sel.value;
@@ -319,26 +320,56 @@ const Dashboard = (function () {
         vends.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
       sel.value = atual || '';
     }
-    _drawPlano(fila, sel ? sel.value : '');
-    setKpi('plano-count', `${fila.length} cliente(s) na fila`);
+    _drawPlano(fila, sel ? sel.value : '', _threshold);
+    _drawInaptas(inaptas);
+    const visivel = fila.filter((x) => x.score >= _threshold).length;
+    setKpi('plano-count', `${visivel} de ${fila.length} cliente(s) na fila`);
   }
 
-  function _drawPlano(fila, vendFilter) {
+  function _drawPlano(fila, vendFilter, threshold) {
     const el = $('plano-table');
     if (!el) return;
-    const rows = vendFilter ? fila.filter((x) => x.vendedor === vendFilter) : fila;
+    let rows = vendFilter ? fila.filter((x) => x.vendedor === vendFilter) : fila;
     if (!rows.length) { el.innerHTML = '<p class="muted">Sem clientes priorizados.</p>'; return; }
+
     let h = `<table class="intel-table"><thead><tr>
-      <th>Prioridade</th><th>Cliente</th><th>Vendedor</th><th>Score</th>
-      <th>Telefone</th><th>Ação recomendada</th></tr></thead><tbody>`;
+      <th>Prioridade</th><th>Cliente</th><th>Sócio / Responsável</th><th>Vendedor</th>
+      <th>Score</th><th>Telefone</th><th>Ação recomendada</th></tr></thead><tbody>`;
     for (const x of rows) {
-      const pill = x.prioridade === 'ALTA' ? 'hot' : 'warn';
-      h += `<tr>
-        <td><span class="pill ${pill}">${esc(x.prioridade)}</span></td>
+      const aboveThreshold = x.score >= threshold;
+      const pillClass = x.prioridade === 'ALTA' ? 'hot' : x.prioridade === 'MEDIA' ? 'warn' : 'ok';
+      const rowClass = aboveThreshold ? '' : 'below-threshold';
+      h += `<tr class="${rowClass}">
+        <td><span class="pill ${pillClass}">${esc(x.prioridade)}</span></td>
         <td><strong>${esc(x.razao)}</strong><br><code class="muted">${esc(x.cnpj)}</code></td>
+        <td>${x.socio ? esc(x.socio) : '<span class="muted">—</span>'}</td>
+        <td>${esc(x.vendedor)}</td>
+        <td><strong>${x.score}</strong></td>
+        <td>${x.telefone ? `<a href="tel:${esc(x.telefone)}" style="color:var(--cyan-400)">${esc(x.telefone)}</a>` : '<span class="muted">—</span>'}</td>
+        <td class="acao-cell">${esc(x.acao)}</td>
+      </tr>`;
+    }
+    h += '</tbody></table>';
+    el.innerHTML = h;
+  }
+
+  function _drawInaptas(inaptas) {
+    const el = $('plano-inaptas');
+    if (!el) return;
+    if (!inaptas.length) {
+      el.innerHTML = '<p class="muted">Nenhuma empresa INAPTA nesta base.</p>';
+      return;
+    }
+    let h = `<table class="intel-table"><thead><tr>
+      <th>Cliente</th><th>Sócio / Responsável</th><th>Vendedor</th>
+      <th>Score</th><th>Telefone</th><th>Gancho de abordagem</th></tr></thead><tbody>`;
+    for (const x of inaptas) {
+      h += `<tr>
+        <td><strong>${esc(x.razao)}</strong><br><code class="muted">${esc(x.cnpj)}</code></td>
+        <td>${x.socio ? esc(x.socio) : '<span class="muted">—</span>'}</td>
         <td>${esc(x.vendedor)}</td>
         <td>${x.score}</td>
-        <td>${x.telefone ? esc(x.telefone) : '<span class="muted">—</span>'}</td>
+        <td>${x.telefone ? `<a href="tel:${esc(x.telefone)}" style="color:var(--cyan-400)">${esc(x.telefone)}</a>` : '<span class="muted">—</span>'}</td>
         <td class="acao-cell">${esc(x.acao)}</td>
       </tr>`;
     }
@@ -350,23 +381,46 @@ const Dashboard = (function () {
     if (!_lastInsights) return;
     const sel = $('plano-vendedor');
     const f = sel ? sel.value : '';
-    const fila = (f ? _lastInsights.planoAcao.filter((x) => x.vendedor === f) : _lastInsights.planoAcao);
-    if (!fila.length) return;
-    const headers = ['prioridade', 'razao_social', 'cnpj', 'vendedor', 'score', 'higiene', 'situacao', 'telefone', 'acao_recomendada'];
+    const { fila } = _lastInsights.planoAcao;
+    const rows = (f ? fila.filter((x) => x.vendedor === f) : fila).filter((x) => x.score >= _threshold);
+    if (!rows.length) return;
+    const headers = ['prioridade', 'razao_social', 'cnpj', 'socio', 'vendedor', 'score', 'higiene', 'situacao', 'telefone', 'acao_recomendada'];
     const esc2 = (v) => {
       const s = String(v ?? '');
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
     const csv = '﻿' + headers.join(',') + '\n' +
-      fila.map((x) => [x.prioridade, x.razao, x.cnpj, x.vendedor, x.score, x.higiene, x.situacao, x.telefone, x.acao].map(esc2).join(',')).join('\n');
+      rows.map((x) => [x.prioridade, x.razao, x.cnpj, x.socio, x.vendedor, x.score, x.higiene, x.situacao, x.telefone, x.acao].map(esc2).join(',')).join('\n');
     if (window.Utils && Utils.downloadCSV) Utils.downloadCSV(csv, 'plano_de_acao_vpa.csv');
   }
 
   function initPlanoControls() {
     const sel = $('plano-vendedor');
     if (sel) sel.addEventListener('change', () => {
-      if (_lastInsights) _drawPlano(_lastInsights.planoAcao, sel.value);
+      if (_lastInsights) {
+        const { fila } = _lastInsights.planoAcao;
+        _drawPlano(fila, sel.value, _threshold);
+        const visivel = fila.filter((x) => x.score >= _threshold).length;
+        setKpi('plano-count', `${visivel} de ${fila.length} cliente(s) na fila`);
+      }
     });
+
+    const slider = $('threshold-slider');
+    const sliderVal = $('threshold-val');
+    if (slider) {
+      slider.addEventListener('input', () => {
+        _threshold = parseInt(slider.value, 10);
+        if (sliderVal) sliderVal.textContent = _threshold;
+        if (_lastInsights) {
+          const sel2 = $('plano-vendedor');
+          const { fila } = _lastInsights.planoAcao;
+          _drawPlano(fila, sel2 ? sel2.value : '', _threshold);
+          const visivel = fila.filter((x) => x.score >= _threshold).length;
+          setKpi('plano-count', `${visivel} de ${fila.length} cliente(s) na fila`);
+        }
+      });
+    }
+
     const btn = $('plano-export');
     if (btn) btn.addEventListener('click', exportPlano);
   }
