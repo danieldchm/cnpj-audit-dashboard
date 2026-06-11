@@ -1,352 +1,402 @@
 /**
- * @file utils.js
- * @description Utility functions for the CNPJ Audit Dashboard.
- * Provides CNPJ formatting, validation, CSV handling, field comparison,
- * divergence analysis, priority determination, and other helpers.
- * Must be loaded before api.js.
+ * @file utils.js (v2)
+ * @description Utilitários do AuditBase + Engine de Scoring Distribuidora v2.
+ *
+ * Mudanças principais em relação à v1:
+ *  - [BUG] Removido ReferenceError no export (determinePriority/determineAction
+ *    agora existem como wrappers de compatibilidade).
+ *  - [BUG] Datas brasileiras (dd/mm/aaaa) parseadas corretamente; datas
+ *    futuras viram flag de qualidade, não bônus de recência.
+ *  - [BUG] parseCSV reescrito como máquina de estados sobre o texto inteiro:
+ *    suporta quebras de linha dentro de campos com aspas.
+ *  - [BUG] exportToXLSX alinhado ao schema real dos resultados.
+ *  - [SCORING v2] Score contínuo de recência (decaimento exponencial),
+ *    afinidade por CÓDIGO CNAE (não substring de descrição), porte calibrado
+ *    para o ICP da distribuidora (pequeno varejo), situação cadastral como GATE
+ *    multiplicativo e separação em dois scores:
+ *      • score_oportunidade — quem contatar primeiro (comercial)
+ *      • score_higiene     — qualidade do cadastro (operacional)
+ *    `score_vpa` é mantido como alias de score_oportunidade p/ compatibilidade.
+ *
+ * Deve ser carregado antes de api.js.
  */
 
 const Utils = (function () {
   'use strict';
 
-  // ───────────────────────────────────────────────
+  // ═══════════════════════════════════════════════
+  // CONFIGURAÇÃO DO SCORING (calibrável)
+  // ═══════════════════════════════════════════════
+  //
+  // IMPORTANTE: estes defaults assumem o ICP de uma distribuidora atacadista
+  // de papelaria — o comprador típico é o PEQUENO varejo (ME/EPP), não a
+  // grande empresa. Valide os pesos de porte contra o histórico real de
+  // vendas dos últimos 24 meses antes de considerar calibrado.
+
+  const SCORE_CONFIG = {
+    // Pesos do Score de Oportunidade (somam 1.0)
+    weights: {
+      recencia: 0.45,
+      afinidade: 0.35,
+      porte: 0.20,
+    },
+
+    // Decaimento exponencial da recência: score = 100 * e^(-dias / TAU)
+    // TAU=730 → 6 meses ≈ 78 pts, 1 ano ≈ 61, 2 anos ≈ 37, 3 anos ≈ 22.
+    recenciaTauDias: 730,
+
+    // Desconto de confiança quando a data de última compra está ausente ou
+    // ilegível: o peso da recência é redistribuído (neutro), mas o score
+    // final é multiplicado por este fator para que um registro INCOMPLETO
+    // não ultrapasse registros completos equivalentes no ranking.
+    // (Calibrado em execução local: sem o desconto, clientes sem data
+    // chegavam ao top 10 acima de clientes com recência conhecida e boa.)
+    descontoDadoRecenciaAusente: 0.85,
+
+    // Pontuação por porte — calibrada para ICP de pequeno varejo.
+    porte: {
+      ME: 85,
+      EPP: 95,
+      DEMAIS: 65,
+      MEI: 40,
+      DESCONHECIDO: 50,
+    },
+
+    // Bônus de "tração": empresa jovem com capital relevante = investimento
+    // recente (abertura/expansão de loja). Aplicado sobre o score de porte.
+    tracao: {
+      idadeMaxAnos: 3,
+      capitalMinimo: 100000,
+      bonus: 10,
+    },
+
+    // Gate multiplicativo por situação cadastral (modelo NÃO compensatório:
+    // recência boa não "compra de volta" uma empresa suspensa).
+    gateSituacao: {
+      ATIVA: 1.0,
+      SUSPENSA: 0.4,
+      INAPTA: 0.25, // regularizável — gancho de conversa, não descarte
+      BAIXADA: 0.0,
+      NULA: 0.0,
+      DESCONHECIDA: 0.5,
+    },
+
+    // Afinidade por código CNAE (prefixos, dígitos apenas).
+    // Prefixo mais longo vence. CNAE secundário vale 60% do primário.
+    cnaeAffinity: {
+      '4761003': 100, // varejo de artigos de papelaria (core absoluto)
+      '4761001': 90,  // varejo de livros
+      '4761002': 80,  // varejo de jornais e revistas
+      '4647801': 90,  // atacado de artigos de escritório e papelaria
+      '4647802': 80,  // atacado de livros, jornais e publicações
+      '4789007': 75,  // varejo de equipamentos para escritório
+      '4755503': 70,  // armarinho
+      '47636': 55,    // brinquedos e artigos recreativos
+      '4789001': 50,  // souvenirs e presentes
+      '47130': 50,    // lojas de departamentos / variedades
+      '85': 65,       // educação (escolas compram material recorrentemente)
+      '18': 60,       // impressão e reprodução (gráficas compram papel)
+      '4711': 40,     // hiper/supermercados
+      '4712': 40,     // minimercados
+    },
+    cnaeSecundarioFator: 0.6,
+    cnaeAffinityDefault: 20,
+
+    // Fallback por palavra-chave quando só há descrição textual.
+    cnaeKeywords: [
+      { re: /PAPELARIA/, score: 100 },
+      { re: /LIVRAR|LIVROS/, score: 90 },
+      { re: /ESCRITORIO|ESCRITÓRIO/, score: 75 },
+      { re: /ARMARINHO/, score: 70 },
+      { re: /JORNAIS|REVISTAS/, score: 70 },
+      { re: /ESCOLA|ENSINO|EDUCA/, score: 65 },
+      { re: /GRAFICA|GRÁFICA|IMPRESS/, score: 60 },
+      { re: /BRINQUEDO/, score: 55 },
+      { re: /PRESENTE|VARIEDADES/, score: 50 },
+    ],
+
+    // Score de Higiene Cadastral (0-100): completude + consistência.
+    higiene: {
+      pontosTelefone: 20,
+      pontosEmail: 15,
+      pontosEndereco: 15,
+      pontosQsa: 10,
+      baseConsistencia: 40,
+      penalidadePorDivergencia: 10,
+    },
+
+    // Limiares de classificação sobre o score_oportunidade pós-gate.
+    thresholds: {
+      quente: 75,
+      alto: 55,
+      moderado: 35,
+    },
+  };
+
+  // ═══════════════════════════════════════════════
   // CNPJ Helpers
-  // ───────────────────────────────────────────────
+  // ═══════════════════════════════════════════════
 
   /**
-   * Strip all non-digit characters from a CNPJ string.
-   * @param {string} cnpj - Raw CNPJ string (formatted or unformatted).
-   * @returns {string} String containing only digit characters.
+   * Remove tudo que não é dígito de um CNPJ.
+   * @param {string} cnpj
+   * @returns {string}
    */
   function cleanCNPJ(cnpj) {
-    if (typeof cnpj !== 'string') {
-      cnpj = String(cnpj ?? '');
-    }
+    if (typeof cnpj !== 'string') cnpj = String(cnpj ?? '');
     return cnpj.replace(/\D/g, '');
   }
 
   /**
-   * Format a raw CNPJ string into the canonical `00.000.000/0001-00` pattern.
-   * Returns the original value when the cleaned input does not have exactly 14 digits.
-   * @param {string} cnpj - Raw CNPJ string (digits only or already formatted).
-   * @returns {string} Formatted CNPJ or the original input if length is invalid.
+   * Formata para `00.000.000/0001-00`. Devolve o original se inválido.
+   * @param {string} cnpj
+   * @returns {string}
    */
   function formatCNPJ(cnpj) {
-    if (typeof cnpj !== 'string') {
-      cnpj = String(cnpj ?? '');
-    }
-    const digits = cleanCNPJ(cnpj);
-    if (digits.length !== 14) {
-      return cnpj; // return original if invalid length
-    }
-    return (
-      digits.slice(0, 2) +
-      '.' +
-      digits.slice(2, 5) +
-      '.' +
-      digits.slice(5, 8) +
-      '/' +
-      digits.slice(8, 12) +
-      '-' +
-      digits.slice(12, 14)
-    );
+    if (typeof cnpj !== 'string') cnpj = String(cnpj ?? '');
+    const d = cleanCNPJ(cnpj);
+    if (d.length !== 14) return cnpj;
+    return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12, 14)}`;
   }
 
   /**
-   * Validate a CNPJ using the official check-digit algorithm.
-   *
-   * Steps:
-   *  1. Clean input to digits only.
-   *  2. Must be exactly 14 digits.
-   *  3. Reject sequences where all digits are the same (e.g. 11111111111111).
-   *  4. Validate first check digit (13th digit).
-   *  5. Validate second check digit (14th digit).
-   *
-   * @param {string} cnpj - CNPJ string (formatted or unformatted).
-   * @returns {boolean} `true` if the CNPJ is mathematically valid.
+   * Valida CNPJ pelo algoritmo oficial de dígitos verificadores.
+   * @param {string} cnpj
+   * @returns {boolean}
    */
   function validateCNPJ(cnpj) {
     const digits = cleanCNPJ(cnpj);
-
-    if (digits.length !== 14) {
-      return false;
-    }
-
-    // Reject all-same-digit sequences
-    if (/^(\d)\1{13}$/.test(digits)) {
-      return false;
-    }
+    if (digits.length !== 14) return false;
+    if (/^(\d)\1{13}$/.test(digits)) return false;
 
     const nums = digits.split('').map(Number);
 
-    // --- First check digit (position 12, 0-indexed) ---
     const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
     let sum1 = 0;
-    for (let i = 0; i < 12; i++) {
-      sum1 += nums[i] * weights1[i];
-    }
-    const remainder1 = sum1 % 11;
-    const check1 = remainder1 < 2 ? 0 : 11 - remainder1;
-    if (nums[12] !== check1) {
-      return false;
-    }
+    for (let i = 0; i < 12; i++) sum1 += nums[i] * weights1[i];
+    const r1 = sum1 % 11;
+    if (nums[12] !== (r1 < 2 ? 0 : 11 - r1)) return false;
 
-    // --- Second check digit (position 13, 0-indexed) ---
     const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
     let sum2 = 0;
-    for (let i = 0; i < 13; i++) {
-      sum2 += nums[i] * weights2[i];
-    }
-    const remainder2 = sum2 % 11;
-    const check2 = remainder2 < 2 ? 0 : 11 - remainder2;
-    if (nums[13] !== check2) {
-      return false;
-    }
+    for (let i = 0; i < 13; i++) sum2 += nums[i] * weights2[i];
+    const r2 = sum2 % 11;
+    if (nums[13] !== (r2 < 2 ? 0 : 11 - r2)) return false;
 
     return true;
   }
 
-  // ───────────────────────────────────────────────
-  // CSV Handling
-  // ───────────────────────────────────────────────
+  // ═══════════════════════════════════════════════
+  // Datas (correção do bug crítico de recência)
+  // ═══════════════════════════════════════════════
 
   /**
-   * Parse CSV text into an array of objects.
+   * Parser de datas tolerante aos formatos reais de planilhas brasileiras.
    *
-   * - Uses the first row as headers (trimmed, lowercased, BOM stripped).
-   * - Handles quoted fields (including commas inside quotes).
-   * - Handles empty fields and trims whitespace from values.
-   * - Skips blank rows.
+   * Suporta: dd/mm/aaaa, dd-mm-aaaa, dd/mm/aa, aaaa-mm-dd (ISO),
+   * aaaa/mm/dd e número serial do Excel (dias desde 30/12/1899).
    *
-   * @param {string} text - Raw CSV text content.
-   * @returns {Array<Object>} Array of row objects keyed by header names.
+   * NUNCA usa `new Date(string)` com formato ambíguo — era isso que fazia
+   * "05/03/2024" virar 3 de maio (padrão US) e "15/03/2024" virar Invalid
+   * Date, zerando silenciosamente 30% do score na v1.
+   *
+   * @param {*} value
+   * @returns {Date|null} Date válida ou null.
+   */
+  function parseDateFlexible(value) {
+    if (value == null || value === '') return null;
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+
+    // Número serial do Excel (planilhas exportadas com célula numérica)
+    if (typeof value === 'number' && isFinite(value) && value > 20000 && value < 80000) {
+      const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+      return new Date(excelEpoch.getTime() + value * 86400000);
+    }
+
+    const str = String(value).trim();
+
+    // ISO: aaaa-mm-dd ou aaaa/mm/dd (com hora opcional)
+    let m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (m) {
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    // Brasileiro: dd/mm/aaaa ou dd-mm-aaaa (aceita aa de 2 dígitos)
+    m = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/);
+    if (m) {
+      let year = Number(m[3]);
+      if (year < 100) year += year >= 70 ? 1900 : 2000;
+      const month = Number(m[2]) - 1;
+      const day = Number(m[1]);
+      if (month < 0 || month > 11 || day < 1 || day > 31) return null;
+      const d = new Date(year, month, day);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    return null;
+  }
+
+  // ═══════════════════════════════════════════════
+  // CSV (parser reescrito — máquina de estados)
+  // ═══════════════════════════════════════════════
+
+  /**
+   * Parse de CSV para array de objetos, usando a primeira linha como headers.
+   *
+   * Diferente da v1, percorre o TEXTO INTEIRO caractere a caractere, então
+   * quebras de linha DENTRO de campos com aspas (razões sociais multilinhas,
+   * endereços com Enter) não corrompem mais o parse.
+   *
+   * Suporta vírgula e ponto-e-vírgula como separador (auto-detectado pela
+   * linha de header — exportações de Excel pt-BR usam ';').
+   *
+   * @param {string} text
+   * @returns {Array<Object>}
    */
   function parseCSV(text) {
-    if (typeof text !== 'string' || text.trim().length === 0) {
-      return [];
-    }
+    if (typeof text !== 'string' || text.trim().length === 0) return [];
 
-    // Remove BOM if present
-    if (text.charCodeAt(0) === 0xfeff) {
-      text = text.slice(1);
-    }
+    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); // BOM
 
-    /**
-     * Parse a single CSV line respecting quoted fields.
-     * @param {string} line - A single CSV line.
-     * @returns {string[]} Array of field values.
-     */
-    function parseLine(line) {
-      const fields = [];
-      let current = '';
-      let inQuotes = false;
-      let i = 0;
+    // Auto-detecção de delimitador na primeira linha não-vazia
+    const firstLine = (text.split(/\r?\n/).find((l) => l.trim() !== '') || '');
+    const delimiter =
+      (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length
+        ? ';'
+        : ',';
 
-      while (i < line.length) {
-        const ch = line[i];
+    /** @type {string[][]} */
+    const rows = [];
+    let row = [];
+    let field = '';
+    let inQuotes = false;
 
-        if (inQuotes) {
-          if (ch === '"') {
-            // Peek ahead: escaped quote or end of quoted field
-            if (i + 1 < line.length && line[i + 1] === '"') {
-              current += '"';
-              i += 2;
-              continue;
-            }
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else {
             inQuotes = false;
-            i++;
-            continue;
           }
-          current += ch;
-          i++;
         } else {
-          if (ch === '"') {
-            inQuotes = true;
-            i++;
-            continue;
-          }
-          if (ch === ',') {
-            fields.push(current.trim());
-            current = '';
-            i++;
-            continue;
-          }
-          current += ch;
-          i++;
+          field += ch; // inclui \n dentro de aspas — caso que quebrava a v1
         }
+        continue;
       }
 
-      // Push last field
-      fields.push(current.trim());
-      return fields;
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === delimiter) {
+        row.push(field.trim());
+        field = '';
+      } else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(field.trim());
+        field = '';
+        if (row.some((f) => f !== '')) rows.push(row);
+        row = [];
+      } else {
+        field += ch;
+      }
     }
+    // Último campo/linha
+    row.push(field.trim());
+    if (row.some((f) => f !== '')) rows.push(row);
 
-    // Split into lines, handling both \r\n and \n
-    const lines = text.split(/\r?\n/);
+    if (rows.length === 0) return [];
 
-    // Find the first non-empty line for headers
-    let headerIndex = 0;
-    while (headerIndex < lines.length && lines[headerIndex].trim() === '') {
-      headerIndex++;
-    }
-
-    if (headerIndex >= lines.length) {
-      return [];
-    }
-
-    const headers = parseLine(lines[headerIndex]).map((h) =>
-      h.toLowerCase().trim()
-    );
-
+    const headers = rows[0].map((h) => h.toLowerCase().trim());
     const results = [];
 
-    for (let r = headerIndex + 1; r < lines.length; r++) {
-      const line = lines[r];
-      if (line.trim() === '') {
-        continue; // skip empty rows
-      }
-      const values = parseLine(line);
-      const row = {};
+    for (let r = 1; r < rows.length; r++) {
+      const values = rows[r];
+      const obj = {};
       for (let c = 0; c < headers.length; c++) {
-        row[headers[c]] = c < values.length ? values[c] : '';
+        obj[headers[c]] = c < values.length ? values[c] : '';
       }
-      results.push(row);
+      results.push(obj);
     }
 
     return results;
   }
 
-  // ───────────────────────────────────────────────
-  // String Comparison
-  // ───────────────────────────────────────────────
+  // ═══════════════════════════════════════════════
+  // Comparação de strings / divergências
+  // ═══════════════════════════════════════════════
 
   /**
-   * Normalize a string for fuzzy comparison by removing cosmetic differences.
-   *
-   * - Converts to uppercase.
-   * - Collapses extra whitespace.
-   * - Replaces common abbreviations: LTDA./LTDA → LIMITADA, S.A./S/A → SA,
-   *   ME. → ME, EPP. → EPP.
-   * - Removes all dots and dashes.
-   * - Trims leading/trailing whitespace.
-   *
-   * @param {string} str - The string to normalize.
-   * @returns {string} Normalized string suitable for comparison.
+   * Normaliza string para comparação fuzzy (caixa, espaços, abreviações).
+   * @param {string} str
+   * @returns {string}
    */
   function normalizeForComparison(str) {
-    if (typeof str !== 'string') {
-      return '';
-    }
-
+    if (typeof str !== 'string') return '';
     let s = str.toUpperCase().trim();
-
-    // Collapse extra whitespace
+    s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove acentos
     s = s.replace(/\s+/g, ' ');
-
-    // Replace common abbreviations (order matters: match longer patterns first)
     s = s.replace(/\bLTDA\b\.?/g, 'LIMITADA');
     s = s.replace(/\bS\.A\.\b/g, 'SA');
     s = s.replace(/\bS\/A\b/g, 'SA');
     s = s.replace(/\bME\b\./g, 'ME');
     s = s.replace(/\bEPP\b\./g, 'EPP');
-
-    // Remove dots and dashes
     s = s.replace(/[.\-]/g, '');
-
     return s.trim();
   }
 
   /**
-   * Compare two field values intelligently, returning a divergence descriptor.
-   *
-   * - If both values are empty/null/undefined → no divergence (returns `null`).
-   * - If `internal` is empty but `official` has a value → divergence.
-   * - For CEP fields: compares digits only.
-   * - For other fields: uses {@link normalizeForComparison}.
-   *
-   * @param {string|null|undefined} internal - Value from internal records.
-   * @param {string|null|undefined} official - Value from official records.
-   * @param {string} fieldName - Name of the field being compared.
-   * @returns {{ isDivergent: boolean, internal: string, official: string } | null}
-   *   Divergence object or `null` when the internal value was not provided.
+   * Compara dois valores de campo e devolve descritor de divergência.
+   * @param {*} internal
+   * @param {*} official
+   * @param {string} fieldName
+   * @returns {{isDivergent:boolean, internal:string, official:string}|null}
    */
   function compareFields(internal, official, fieldName) {
     const internalStr = (internal ?? '').toString().trim();
     const officialStr = (official ?? '').toString().trim();
 
-    // Both empty → no divergence
-    if (internalStr === '' && officialStr === '') {
-      return null;
+    if (internalStr === '' && officialStr === '') return null;
+
+    // Interno vazio + oficial preenchido = enriquecimento, não divergência
+    if (internalStr === '') {
+      return { isDivergent: false, internal: internalStr, official: officialStr };
+    }
+    // Sem dado oficial não há como comparar
+    if (officialStr === '') {
+      return { isDivergent: false, internal: internalStr, official: officialStr };
     }
 
-    // Internal empty, official has data → enrichment, NOT a divergence
-    if (internalStr === '' && officialStr !== '') {
-      return {
-        isDivergent: false,
-        internal: internalStr,
-        official: officialStr,
-      };
-    }
-
-    // If we have no official data, we can't compare
-    if (officialStr === '' && internalStr !== '') {
-      return {
-        isDivergent: false,
-        internal: internalStr,
-        official: officialStr,
-      };
-    }
-
-    // CEP: compare digits only
     if (fieldName.toLowerCase() === 'cep') {
-      const internalDigits = internalStr.replace(/\D/g, '');
-      const officialDigits = officialStr.replace(/\D/g, '');
-      return {
-        isDivergent: internalDigits !== officialDigits,
-        internal: internalStr,
-        official: officialStr,
-      };
+      const a = internalStr.replace(/\D/g, '');
+      const b = officialStr.replace(/\D/g, '');
+      return { isDivergent: a !== b, internal: internalStr, official: officialStr };
     }
 
-    // General comparison using normalization
-    const normInternal = normalizeForComparison(internalStr);
-    const normOfficial = normalizeForComparison(officialStr);
-
-    return {
-      isDivergent: normInternal !== normOfficial,
-      internal: internalStr,
-      official: officialStr,
-    };
+    const normA = normalizeForComparison(internalStr);
+    const normB = normalizeForComparison(officialStr);
+    return { isDivergent: normA !== normB, internal: internalStr, official: officialStr };
   }
 
-  // ───────────────────────────────────────────────
-  // Divergence & Audit Logic
-  // ───────────────────────────────────────────────
-
   /**
-   * Compare all relevant fields between internal and official data.
+   * Gera a lista de divergências entre cadastro interno e dados oficiais.
    *
-   * Fields compared:
-   * | Internal key    | Official key              |
-   * |-----------------|---------------------------|
-   * | razao_social    | razao_social              |
-   * | nome_fantasia   | nome_fantasia             |
-   * | cep             | cep                       |
-   * | logradouro      | logradouro                |
-   * | municipio       | municipio                 |
-   * | uf              | uf                        |
-   * | cnae            | cnae_fiscal_descricao     |
+   * MUDANÇA v2: o campo CNAE só é comparado quando é COMPARÁVEL —
+   * código numérico interno vs `cnae_fiscal` oficial. Comparar texto livre
+   * ("Comércio varejista") com a descrição oficial completa divergia em
+   * ~100% dos registros na v1, inflando artificialmente as divergências e
+   * achatando o score cadastral de toda a base no teto de 60.
    *
-   * @param {Object} internalData - Client record from internal CSV.
-   * @param {Object} officialData - Record returned by BrasilAPI.
-   * @returns {Array<{ campo_com_divergencia: string, valor_interno: string, valor_oficial: string }>}
+   * @param {Object} internalData
+   * @param {Object} officialData
+   * @returns {Array<{campo_com_divergencia:string, valor_interno:string, valor_oficial:string}>}
    */
   function generateDivergences(internalData, officialData) {
-    if (!internalData || !officialData) {
-      return [];
-    }
+    if (!internalData || !officialData) return [];
 
-    /** @type {Array<[string, string, string]>} [fieldLabel, internalKey, officialKey] */
     const fieldMap = [
       ['razao_social', 'razao_social', 'razao_social'],
       ['nome_fantasia', 'nome_fantasia', 'nome_fantasia'],
@@ -354,23 +404,31 @@ const Utils = (function () {
       ['logradouro', 'logradouro', 'logradouro'],
       ['municipio', 'municipio', 'municipio'],
       ['uf', 'uf', 'uf'],
-      ['cnae', 'cnae', 'cnae_fiscal_descricao'],
     ];
 
     const divergences = [];
 
-    for (const [fieldLabel, intKey, offKey] of fieldMap) {
-      const result = compareFields(
-        internalData[intKey],
-        officialData[offKey],
-        fieldLabel
-      );
-
+    for (const [label, intKey, offKey] of fieldMap) {
+      const result = compareFields(internalData[intKey], officialData[offKey], label);
       if (result && result.isDivergent) {
         divergences.push({
-          campo_com_divergencia: fieldLabel,
+          campo_com_divergencia: label,
           valor_interno: result.internal,
           valor_oficial: result.official,
+        });
+      }
+    }
+
+    // CNAE: compara apenas código-com-código
+    const internalCnaeDigits = String(internalData.cnae ?? '').replace(/\D/g, '');
+    const officialCnaeDigits = String(officialData.cnae_fiscal ?? '').replace(/\D/g, '');
+    if (internalCnaeDigits.length >= 5 && officialCnaeDigits.length >= 5) {
+      const len = Math.min(internalCnaeDigits.length, officialCnaeDigits.length, 7);
+      if (internalCnaeDigits.slice(0, len) !== officialCnaeDigits.slice(0, len)) {
+        divergences.push({
+          campo_com_divergencia: 'cnae',
+          valor_interno: String(internalData.cnae),
+          valor_oficial: `${officialData.cnae_fiscal} - ${officialData.cnae_fiscal_descricao ?? ''}`,
         });
       }
     }
@@ -378,155 +436,331 @@ const Utils = (function () {
     return divergences;
   }
 
+  // ═══════════════════════════════════════════════
+  // ENGINE DE SCORING Distribuidora v2
+  // ═══════════════════════════════════════════════
+
   /**
-   * Advanced Distribuidora Scoring Engine
-   * Calculates the final score (0-100) based on multiple strategic components.
+   * Detecta o porte de forma robusta contra as variações reais da BrasilAPI
+   * ("MICRO EMPRESA", "EMPRESA DE PEQUENO PORTE", "DEMAIS", códigos "01/03/05").
+   * A v1 usava `includes('EPP')`, que NUNCA casa com "EMPRESA DE PEQUENO PORTE".
    *
-   * @param {Object} internalData 
-   * @param {Object} officialData 
-   * @param {Array} divergences 
-   * @returns {Object} Score breakdown, total score, priority, action
+   * @param {Object} officialData
+   * @returns {'MEI'|'ME'|'EPP'|'DEMAIS'|'DESCONHECIDO'}
    */
-  function calculateVpaScore(internalData, officialData, divergences) {
-    let scoreRecencia = 0;
-    let scorePorte = 0;
-    let scoreCadastral = 0;
-    let scoreDados = 0;
-    let scoreAfinidade = 0;
-    
-    // 1. Score Recência (30%)
-    let diasInativos = -1;
-    if (internalData.ultcpr) {
-      const ultCprDate = new Date(internalData.ultcpr);
-      if (!isNaN(ultCprDate.getTime())) {
-        const diffTime = Math.abs(new Date() - ultCprDate);
-        diasInativos = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (diasInativos <= 180) scoreRecencia = 90; // < 6 meses
-        else if (diasInativos <= 365) scoreRecencia = 70; // 6-12 meses
-        else if (diasInativos <= 730) scoreRecencia = 50; // 1-2 anos
-        else if (diasInativos <= 1095) scoreRecencia = 30; // 2-3 anos
-        else scoreRecencia = 10; // > 3 anos
+  function detectPorte(officialData) {
+    if (officialData?.opcao_pelo_mei === true) return 'MEI';
+    const raw = String(officialData?.porte ?? '').toUpperCase().trim();
+    if (raw.includes('MICRO')) return 'ME';
+    if (raw.includes('PEQUENO') || raw === 'EPP') return 'EPP';
+    if (raw.includes('DEMAIS')) return 'DEMAIS';
+    if (raw === '01' || raw === '1' || raw === 'ME') return 'ME';
+    if (raw === '03' || raw === '3') return 'EPP';
+    if (raw === '05' || raw === '5') return 'DEMAIS';
+    return 'DESCONHECIDO';
+  }
+
+  /**
+   * Calcula afinidade (0-100) a partir dos CÓDIGOS CNAE, com fallback por
+   * palavra-chave. Primário vale peso cheio; secundários valem 60%.
+   * Prefixo mais longo da tabela vence (7 dígitos > 5 > 4 > 2).
+   *
+   * @param {Object} officialData
+   * @returns {{score:number, origem:string}}
+   */
+  function getCnaeAffinity(officialData) {
+    const table = SCORE_CONFIG.cnaeAffinity;
+
+    function lookupCode(code) {
+      const digits = String(code ?? '').replace(/\D/g, '');
+      if (!digits) return null;
+      // tenta prefixos do mais específico ao mais genérico
+      for (let len = Math.min(digits.length, 7); len >= 2; len--) {
+        const prefix = digits.slice(0, len);
+        if (table[prefix] != null) return table[prefix];
+      }
+      return null;
+    }
+
+    function lookupKeywords(desc) {
+      const d = normalizeForComparison(String(desc ?? ''));
+      if (!d) return null;
+      for (const { re, score } of SCORE_CONFIG.cnaeKeywords) {
+        if (re.test(d)) return score;
+      }
+      return null;
+    }
+
+    let best = null;
+    let origem = 'default';
+
+    // CNAE primário
+    const primario =
+      lookupCode(officialData?.cnae_fiscal) ??
+      lookupKeywords(officialData?.cnae_fiscal_descricao);
+    if (primario != null) {
+      best = primario;
+      origem = 'primario';
+    }
+
+    // CNAEs secundários (valem 60%)
+    if (Array.isArray(officialData?.cnaes_secundarios)) {
+      for (const c of officialData.cnaes_secundarios) {
+        const s = lookupCode(c?.codigo) ?? lookupKeywords(c?.descricao);
+        if (s != null) {
+          const weighted = s * SCORE_CONFIG.cnaeSecundarioFator;
+          if (best == null || weighted > best) {
+            best = weighted;
+            origem = 'secundario';
+          }
+        }
       }
     }
-    
-    // 2. Score Porte (15%)
-    const porteStr = (officialData?.porte || '').toUpperCase();
-    const capital = parseFloat(officialData?.capital_social) || 0;
-    if (porteStr === 'DEMAIS' || capital > 500000) scorePorte = 90;
-    else if (porteStr.includes('EPP') || (capital >= 50000 && capital <= 500000)) scorePorte = 60;
-    else if (porteStr.includes('ME') || (capital > 0 && capital < 50000)) scorePorte = 30;
-    else scorePorte = 15; // MEI or unknown
-    
-    // 3. Score Cadastral (20%)
-    const situacao = (officialData?.descricao_situacao_cadastral || '').toUpperCase();
-    const numDiv = divergences.length;
-    if (situacao === 'ATIVA') {
-      if (numDiv === 0) scoreCadastral = 100;
-      else scoreCadastral = 60;
-    } else if (situacao === 'SUSPENSA') {
-      scoreCadastral = 20;
-    } else {
-      scoreCadastral = 0; // BAIXADA
-    }
-    
-    // 4. Score Dados (15%)
-    if (officialData?.ddd_telefone_1) scoreDados += 30;
-    if (officialData?.email) scoreDados += 30;
-    if (Array.isArray(officialData?.qsa) && officialData.qsa.length > 0) scoreDados += 20;
-    if (officialData?.logradouro) scoreDados += 20;
-    
-    // 5. Score Afinidade CNAE (20%)
-    const cnae = (officialData?.cnae_fiscal_descricao || '').toUpperCase();
-    const cnaesSecundarios = Array.isArray(officialData?.cnaes_secundarios) 
-      ? officialData.cnaes_secundarios.map(c => c.descricao.toUpperCase()).join(' ') 
-      : '';
-    const allCnaes = cnae + ' ' + cnaesSecundarios;
-    
-    if (allCnaes.includes('PAPELARIA') || allCnaes.includes('LIVROS') || allCnaes.includes('LIVRARIA') || allCnaes.includes('JORNAIS')) {
-      scoreAfinidade = 100; // Core
-    } else if (allCnaes.includes('ARMARINHO')) {
-      scoreAfinidade = 70; // Alta
-    } else if (allCnaes.includes('BRINQUEDOS') || allCnaes.includes('PRESENTES') || allCnaes.includes('VAREJISTA DE PRODUTOS NOVOS')) {
-      scoreAfinidade = 50; // Média
-    } else {
-      scoreAfinidade = 20; // Outros
-    }
-    
-    // Calcula Score Final
-    const totalScore = Math.round(
-      (scoreRecencia * 0.30) +
-      (scorePorte * 0.15) +
-      (scoreCadastral * 0.20) +
-      (scoreDados * 0.15) +
-      (scoreAfinidade * 0.20)
-    );
-    
-    // Classification and Priority Map
-    let classification = '';
-    let priority = '';
-    let action = '';
-    let color = '';
-    
-    if (situacao !== 'ATIVA') {
-       classification = '🔴 DESCARTE / ARQUIVO';
-       priority = 'ALTA';
-       action = `BLOQUEAR CADASTRO - Empresa ${situacao}`;
-       color = 'red';
-    } else if (totalScore >= 80) {
-       classification = '🟢 OPORTUNIDADE QUENTE';
-       priority = 'ALTA';
-       action = 'Ligação direta do vendedor. Validar divergências pendentes.';
-       color = 'green';
-    } else if (totalScore >= 60) {
-       classification = '🔵 POTENCIAL ALTO';
-       priority = 'MEDIA';
-       action = 'SDR: Agendar visita + Enviar WhatsApp com catálogo Distribuidora.';
-       color = 'blue';
-    } else if (totalScore >= 40) {
-       classification = '🟡 POTENCIAL MODERADO';
-       priority = 'MEDIA';
-       action = 'Campanha de E-mail Marketing / Nutrição.';
-       color = 'yellow';
-    } else {
-       classification = '🟠 REQUER INVESTIGAÇÃO';
-       priority = 'BAIXA';
-       action = 'Investigar se perfil de cliente mudou. Baixa probabilidade de recompra imediata.';
-       color = 'orange';
-    }
-    
+
     return {
-      totalScore,
-      priority,
-      classification,
-      action,
-      color,
-      breakdown: {
-        diasInativos,
-        scoreRecencia,
-        scorePorte,
-        scoreCadastral,
-        scoreDados,
-        scoreAfinidade
-      }
+      score: Math.round(best != null ? best : SCORE_CONFIG.cnaeAffinityDefault),
+      origem,
     };
   }
 
   /**
-   * Build the complete audit result JSON for a single client.
+   * Engine de Scoring Distribuidora v2.
    *
-   * Assembles divergences, priority, action, validity flag, and timestamps.
-   * The `inteligencia_web` field is set to `null` (populated later by api.js).
+   * Modelo:
+   *   score_oportunidade = gate(situação) × Σ(componente × peso renormalizado)
+   *     componentes: recência (45%), afinidade CNAE (35%), porte (20%)
+   *   score_higiene = completude do cadastro + consistência (divergências)
    *
-   * @param {Object} internalData - Client record from internal CSV.
-   * @param {Object} officialData - Record returned by BrasilAPI.
-   * @returns {Object} Full audit result object.
+   * Decisões de desenho (ver relatório de revisão):
+   *  - Recência contínua: 100·e^(-dias/730). Sem efeito-penhasco nos 180/365d.
+   *  - Data de última compra AUSENTE ou FUTURA → componente neutro: o peso é
+   *    redistribuído entre os demais e o registro recebe flag. Na v1, ausência
+   *    valia 0 e ranqueava o cliente ABAIXO de um inativo há 4 anos.
+   *  - Situação cadastral é gate multiplicativo, não componente aditivo:
+   *    SUSPENSA não soma pontos "compensáveis" por boa recência.
+   *  - Divergência cadastral NÃO derruba o score comercial: mudou de endereço
+   *    pode significar que cresceu. Vai para o score_higiene.
+   *  - INAPTA é tratada à parte: é regularizável (≠ BAIXADA) e vira gancho
+   *    de conversa do vendedor.
+   *
+   * @param {Object} internalData
+   * @param {Object} officialData
+   * @param {Array} divergences
+   * @returns {Object} { totalScore, scoreOportunidade, scoreHigiene, priority,
+   *                     classification, action, color, flags, breakdown }
+   */
+  function calculateVpaScore(internalData, officialData, divergences) {
+    const cfg = SCORE_CONFIG;
+    const flags = [];
+
+    // ── 1. Recência (contínua) ──────────────────
+    let diasInativos = -1;
+    let scoreRecencia = null; // null = indisponível (peso será redistribuído)
+
+    const ultCprDate = parseDateFlexible(internalData?.ultcpr);
+    if (ultCprDate) {
+      const diffMs = Date.now() - ultCprDate.getTime();
+      if (diffMs < 0) {
+        flags.push('DATA_ULTIMA_COMPRA_FUTURA'); // erro de digitação no ERP
+      } else {
+        diasInativos = Math.floor(diffMs / 86400000);
+        scoreRecencia = Math.round(100 * Math.exp(-diasInativos / cfg.recenciaTauDias));
+      }
+    } else if (internalData?.ultcpr) {
+      flags.push('DATA_ULTIMA_COMPRA_ILEGIVEL');
+    } else {
+      flags.push('SEM_DATA_ULTIMA_COMPRA');
+    }
+
+    // ── 2. Porte (calibrado p/ ICP pequeno varejo) ──
+    const porte = detectPorte(officialData);
+    let scorePorte = cfg.porte[porte] ?? cfg.porte.DESCONHECIDO;
+
+    // Bônus de tração: empresa jovem com capital relevante
+    const capital = parseFloat(officialData?.capital_social) || 0;
+    const inicio = parseDateFlexible(officialData?.data_inicio_atividade);
+    if (inicio) {
+      const idadeAnos = (Date.now() - inicio.getTime()) / (365.25 * 86400000);
+      if (idadeAnos <= cfg.tracao.idadeMaxAnos && capital >= cfg.tracao.capitalMinimo) {
+        scorePorte = Math.min(100, scorePorte + cfg.tracao.bonus);
+        flags.push('TRACAO_EMPRESA_JOVEM_CAPITALIZADA');
+      }
+    }
+
+    // ── 3. Afinidade por código CNAE ────────────
+    const afinidade = getCnaeAffinity(officialData);
+    const scoreAfinidade = afinidade.score;
+
+    // ── 4. Soma ponderada com redistribuição ────
+    const components = [
+      { score: scoreRecencia, weight: cfg.weights.recencia },
+      { score: scoreAfinidade, weight: cfg.weights.afinidade },
+      { score: scorePorte, weight: cfg.weights.porte },
+    ];
+    const available = components.filter((c) => c.score != null);
+    const weightSum = available.reduce((s, c) => s + c.weight, 0) || 1;
+    let baseScore = available.reduce(
+      (s, c) => s + c.score * (c.weight / weightSum),
+      0
+    );
+
+    // Desconto de confiança: registro sem recência conhecida não deve
+    // ultrapassar registro completo equivalente no ranking.
+    if (scoreRecencia == null) {
+      baseScore *= cfg.descontoDadoRecenciaAusente;
+    }
+
+    // ── 5. Gate por situação cadastral ──────────
+    const situacao = String(
+      officialData?.descricao_situacao_cadastral ?? ''
+    ).toUpperCase().trim();
+    const gateKey = ['ATIVA', 'SUSPENSA', 'INAPTA', 'BAIXADA', 'NULA'].includes(situacao)
+      ? situacao
+      : 'DESCONHECIDA';
+    const gate = cfg.gateSituacao[gateKey];
+
+    const scoreOportunidade = Math.round(baseScore * gate);
+
+    // ── 6. Score de Higiene Cadastral (separado) ──
+    const h = cfg.higiene;
+    let completude = 0;
+    if (officialData?.ddd_telefone_1) completude += h.pontosTelefone;
+    if (officialData?.email) completude += h.pontosEmail;
+    if (officialData?.logradouro) completude += h.pontosEndereco;
+    if (Array.isArray(officialData?.qsa) && officialData.qsa.length > 0) {
+      completude += h.pontosQsa;
+    }
+    const numDiv = Array.isArray(divergences) ? divergences.length : 0;
+    const consistencia = Math.max(
+      0,
+      h.baseConsistencia - numDiv * h.penalidadePorDivergencia
+    );
+    const scoreHigiene = Math.round(completude + consistencia);
+
+    // ── 7. Classificação e ação ─────────────────
+    // Prioridade comercial e ação administrativa são campos SEPARADOS:
+    // na v1, BAIXADA recebia priority 'ALTA' e poluía o topo da ordenação
+    // do vendedor junto com as oportunidades quentes.
+    let classification, priority, action, color;
+    let acaoAdministrativa = null;
+
+    if (gateKey === 'BAIXADA' || gateKey === 'NULA') {
+      classification = '🔴 DESCARTE / ARQUIVO';
+      priority = 'DESCARTE';
+      action = 'Arquivar. Cruzar QSA: sócio pode ter reaberto em novo CNPJ.';
+      acaoAdministrativa = `BLOQUEAR CADASTRO — Empresa ${gateKey}`;
+      color = 'red';
+    } else if (gateKey === 'INAPTA') {
+      classification = '🟣 INAPTA — REGULARIZÁVEL';
+      priority = 'BAIXA';
+      action =
+        'Situação regularizável junto à Receita. Vendedor pode usar como gancho: ' +
+        '"vimos uma pendência no CNPJ de vocês". Reavaliar após regularização.';
+      acaoAdministrativa = 'SUSPENDER FATURAMENTO até regularização';
+      color = 'purple';
+    } else if (gateKey === 'SUSPENSA') {
+      classification = '🟠 SUSPENSA — MONITORAR';
+      priority = 'BAIXA';
+      action = 'Não abordar agora. Monitorar mudança de situação cadastral.';
+      acaoAdministrativa = 'SUSPENDER FATURAMENTO até regularização';
+      color = 'orange';
+    } else if (scoreOportunidade >= cfg.thresholds.quente) {
+      classification = '🟢 OPORTUNIDADE QUENTE';
+      priority = 'ALTA';
+      action = 'Ligação direta do vendedor nas próximas 48h.';
+      color = 'green';
+    } else if (scoreOportunidade >= cfg.thresholds.alto) {
+      classification = '🔵 POTENCIAL ALTO';
+      priority = 'MEDIA';
+      action = 'SDR: agendar contato + WhatsApp com catálogo Distribuidora.';
+      color = 'blue';
+    } else if (scoreOportunidade >= cfg.thresholds.moderado) {
+      classification = '🟡 POTENCIAL MODERADO';
+      priority = 'MEDIA';
+      action = 'Campanha de e-mail marketing / nutrição.';
+      color = 'yellow';
+    } else {
+      classification = '⚪ BAIXA PRIORIDADE';
+      priority = 'BAIXA';
+      action = 'Fila de nutrição de longo prazo. Reavaliar no próximo ciclo.';
+      color = 'gray';
+    }
+
+    if (scoreHigiene < 50 && gateKey === 'ATIVA') {
+      action += ' [Higienizar cadastro antes do contato]';
+    }
+
+    return {
+      // Compatibilidade: totalScore continua existindo (= oportunidade)
+      totalScore: scoreOportunidade,
+      scoreOportunidade,
+      scoreHigiene,
+      priority,
+      classification,
+      action,
+      acaoAdministrativa,
+      color,
+      flags,
+      breakdown: {
+        diasInativos,
+        scoreRecencia: scoreRecencia ?? 'N/D',
+        scorePorte,
+        porteDetectado: porte,
+        scoreAfinidade,
+        afinidadeOrigem: afinidade.origem,
+        situacao: gateKey,
+        gate,
+        completudeCadastro: completude,
+        consistenciaCadastro: consistencia,
+        numDivergencias: numDiv,
+      },
+    };
+  }
+
+  // ═══════════════════════════════════════════════
+  // Compatibilidade v1 (corrige o ReferenceError do export)
+  // ═══════════════════════════════════════════════
+
+  /**
+   * Wrapper de compatibilidade — a v1 exportava esta função sem defini-la,
+   * o que lançava ReferenceError e quebrava o módulo inteiro no load.
+   * @param {Object} internalData
+   * @param {Object} officialData
+   * @param {Array} [divergences]
+   * @returns {string} 'ALTA' | 'MEDIA' | 'BAIXA' | 'DESCARTE'
+   */
+  function determinePriority(internalData, officialData, divergences) {
+    const div = divergences ?? generateDivergences(internalData, officialData);
+    return calculateVpaScore(internalData, officialData, div).priority;
+  }
+
+  /**
+   * Wrapper de compatibilidade (idem acima).
+   * @param {Object} internalData
+   * @param {Object} officialData
+   * @param {Array} [divergences]
+   * @returns {string} Ação recomendada.
+   */
+  function determineAction(internalData, officialData, divergences) {
+    const div = divergences ?? generateDivergences(internalData, officialData);
+    return calculateVpaScore(internalData, officialData, div).action;
+  }
+
+  // ═══════════════════════════════════════════════
+  // Resultado de auditoria
+  // ═══════════════════════════════════════════════
+
+  /**
+   * Monta o resultado de auditoria completo de um cliente.
+   * @param {Object} internalData
+   * @param {Object} officialData
+   * @returns {Object}
    */
   function generateAuditResult(internalData, officialData) {
     const divergences = generateDivergences(internalData, officialData);
-    const vpaScoring = calculateVpaScore(internalData, officialData, divergences);
+    const vpa = calculateVpaScore(internalData, officialData, divergences);
 
-    const situacao = (
+    const situacao = String(
       officialData?.descricao_situacao_cadastral ?? ''
     ).toUpperCase();
     const cadastroValido = situacao === 'ATIVA' && divergences.length === 0;
@@ -539,26 +773,30 @@ const Utils = (function () {
       cadastro_valido: cadastroValido,
       divergencias: divergences,
       num_divergencias: divergences.length,
-      prioridade_geral: vpaScoring.priority,
-      acao_recomendada: vpaScoring.action,
-      score_vpa: vpaScoring.totalScore,
-      score_breakdown: vpaScoring.breakdown,
+      prioridade_geral: vpa.priority,
+      acao_recomendada: vpa.action,
+      acao_administrativa: vpa.acaoAdministrativa,
+      classificacao: vpa.classification,
+      // score_vpa mantido como alias do score de oportunidade (compat v1)
+      score_vpa: vpa.totalScore,
+      score_oportunidade: vpa.scoreOportunidade,
+      score_higiene: vpa.scoreHigiene,
+      score_flags: vpa.flags,
+      score_breakdown: vpa.breakdown,
       dados_completos_receita: officialData,
-      inteligencia_web: null, // populated by api.js → generateWebIntelligence
+      inteligencia_web: null, // populado por api.js
       data_consulta: new Date().toISOString(),
     };
   }
 
-  // ───────────────────────────────────────────────
-  // CSV Export / Download
-  // ───────────────────────────────────────────────
+  // ═══════════════════════════════════════════════
+  // Exportações (CSV / XLSX / JSON)
+  // ═══════════════════════════════════════════════
 
   /**
-   * Escape a value for CSV output.
-   * Wraps the value in double quotes if it contains commas, double quotes,
-   * or newlines. Double quotes inside the value are escaped by doubling.
-   * @param {*} value - The value to escape.
-   * @returns {string} CSV-safe string.
+   * Escapa valor para CSV.
+   * @param {*} value
+   * @returns {string}
    */
   function escapeCSVField(value) {
     const str = String(value ?? '');
@@ -569,50 +807,52 @@ const Utils = (function () {
   }
 
   /**
-   * Convert an array of audit result objects to a CSV string.
-   *
-   * Exports ALL fields from BrasilAPI for future use, including:
-   * situação cadastral, data situação, motivo, natureza jurídica, porte,
-   * data início, endereço completo, telefones, email, sócios (QSA),
-   * CNAEs secundários, capital social, opção Simples/MEI, etc.
-   *
-   * @param {Array<Object>} results - Array of audit result objects.
-   * @returns {string} CSV-formatted string (UTF-8 with BOM for Excel compat).
+   * Converte resultados de auditoria em CSV (UTF-8 com BOM para Excel).
+   * @param {Array<Object>} results
+   * @returns {string}
    */
   function exportToCSV(results) {
-    if (!Array.isArray(results) || results.length === 0) {
-      return '';
-    }
+    if (!Array.isArray(results) || results.length === 0) return '';
 
     const headers = [
-      // Audit results
       'cnpj_analisado',
       'vendedor_responsavel',
+      'codigo_cliente',
       'status_receita',
+      'classificacao',
+      'prioridade_geral',
+      'score_oportunidade',
+      'score_higiene',
+      'dias_inativos',
+      'score_recencia',
+      'score_porte',
+      'porte_detectado',
+      'score_afinidade',
+      'flags_qualidade',
       'cadastro_valido',
       'num_divergencias',
       'divergencias_resumo',
-      'prioridade_geral',
       'acao_recomendada',
+      'acao_administrativa',
       'data_consulta',
       // Web intelligence
       'web_operacao_ativa',
       'web_link_principal',
       'web_resumo_atuacao',
-      // Dados oficiais — Identificação
+      // Dados oficiais — identificação
       'razao_social',
       'nome_fantasia',
       'natureza_juridica',
       'porte',
       'capital_social',
       'data_inicio_atividade',
-      // Situação cadastral
+      // Situação
       'situacao_cadastral',
       'data_situacao_cadastral',
       'motivo_situacao_cadastral',
       'situacao_especial',
       'data_situacao_especial',
-      // Endereço completo
+      // Endereço
       'cep',
       'logradouro',
       'numero',
@@ -625,76 +865,79 @@ const Utils = (function () {
       'ddd_telefone_2',
       'ddd_fax',
       'email',
-      // Atividades econômicas
+      // CNAE
       'cnae_fiscal',
       'cnae_fiscal_descricao',
       'cnaes_secundarios',
-      // Opções tributárias
+      // Tributário
       'opcao_pelo_simples',
       'data_opcao_pelo_simples',
       'data_exclusao_do_simples',
       'opcao_pelo_mei',
       'data_opcao_pelo_mei',
       'data_exclusao_do_mei',
-      // Entidade responsável
       'ente_federativo_responsavel',
-      // Sócios (QSA)
       'qsa_socios',
     ];
 
     const rows = results.map((r) => {
       const rec = r.dados_completos_receita || {};
       const web = r.inteligencia_web || {};
+      const bd = r.score_breakdown || {};
 
       const divergenciasResumo = Array.isArray(r.divergencias)
         ? r.divergencias.map((d) => d.campo_com_divergencia).join('; ')
         : '';
 
-      // Format QSA (sócios) as semicolon-separated list
       let qsaStr = '';
       if (Array.isArray(rec.qsa) && rec.qsa.length > 0) {
-        qsaStr = rec.qsa.map(s =>
-          `${s.nome_socio || s.nome || ''} (${s.qualificacao_socio || s.qual || ''})`
-        ).join('; ');
+        qsaStr = rec.qsa
+          .map((s) => `${s.nome_socio || s.nome || ''} (${s.qualificacao_socio || s.qual || ''})`)
+          .join('; ');
       }
 
-      // Format CNAEs secundários as semicolon-separated list
       let cnaesSecStr = '';
       if (Array.isArray(rec.cnaes_secundarios) && rec.cnaes_secundarios.length > 0) {
-        cnaesSecStr = rec.cnaes_secundarios.map(c =>
-          `${c.codigo || ''} - ${c.descricao || ''}`
-        ).join('; ');
+        cnaesSecStr = rec.cnaes_secundarios
+          .map((c) => `${c.codigo || ''} - ${c.descricao || ''}`)
+          .join('; ');
       }
 
       const values = [
-        // Audit
         r.cnpj_analisado ?? '',
         r.vendedor ?? '',
+        r.codigo_cliente ?? '',
         r.status_receita ?? '',
+        r.classificacao ?? '',
+        r.prioridade_geral ?? '',
+        r.score_oportunidade ?? r.score_vpa ?? '',
+        r.score_higiene ?? '',
+        bd.diasInativos ?? '',
+        bd.scoreRecencia ?? '',
+        bd.scorePorte ?? '',
+        bd.porteDetectado ?? '',
+        bd.scoreAfinidade ?? '',
+        Array.isArray(r.score_flags) ? r.score_flags.join('; ') : '',
         r.cadastro_valido ? 'SIM' : 'NÃO',
         r.num_divergencias ?? 0,
         divergenciasResumo,
-        r.prioridade_geral ?? '',
         r.acao_recomendada ?? '',
+        r.acao_administrativa ?? '',
         r.data_consulta ?? '',
-        // Web
         web.indicios_de_operacao_ativa ? 'SIM' : 'NÃO',
         web.link_principal_encontrado ?? '',
         web.resumo_da_atuacao ?? '',
-        // Identificação
         rec.razao_social ?? '',
         rec.nome_fantasia ?? '',
         rec.natureza_juridica ?? '',
         rec.porte ?? '',
         rec.capital_social != null ? formatCurrency(rec.capital_social) : '',
         rec.data_inicio_atividade ?? '',
-        // Situação
         rec.descricao_situacao_cadastral ?? '',
         rec.data_situacao_cadastral ?? '',
         rec.motivo_situacao_cadastral ?? '',
         rec.situacao_especial ?? '',
         rec.data_situacao_especial ?? '',
-        // Endereço
         rec.cep ?? '',
         rec.logradouro ?? '',
         rec.numero ?? '',
@@ -702,40 +945,33 @@ const Utils = (function () {
         rec.bairro ?? '',
         rec.municipio ?? '',
         rec.uf ?? '',
-        // Contato
         rec.ddd_telefone_1 ?? '',
         rec.ddd_telefone_2 ?? '',
         rec.ddd_fax ?? '',
         rec.email ?? '',
-        // CNAE
         rec.cnae_fiscal ?? '',
         rec.cnae_fiscal_descricao ?? '',
         cnaesSecStr,
-        // Tributário
         rec.opcao_pelo_simples != null ? (rec.opcao_pelo_simples ? 'SIM' : 'NÃO') : '',
         rec.data_opcao_pelo_simples ?? '',
         rec.data_exclusao_do_simples ?? '',
         rec.opcao_pelo_mei != null ? (rec.opcao_pelo_mei ? 'SIM' : 'NÃO') : '',
         rec.data_opcao_pelo_mei ?? '',
         rec.data_exclusao_do_mei ?? '',
-        // Ente federativo
         rec.ente_federativo_responsavel ?? '',
-        // QSA
         qsaStr,
       ];
 
       return values.map(escapeCSVField).join(',');
     });
 
-    // BOM for Excel UTF-8 compatibility
     return '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
   }
 
   /**
-   * Generic function to trigger a browser download from a Blob.
-   *
-   * @param {Blob} blob - The file content.
-   * @param {string} filename - Download file name.
+   * Dispara download de um Blob.
+   * @param {Blob} blob
+   * @param {string} filename
    */
   function downloadBlob(blob, filename) {
     try {
@@ -749,19 +985,18 @@ const Utils = (function () {
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('downloadBlob: failed to trigger download.', err);
+      console.error('downloadBlob: falha ao disparar download.', err);
     }
   }
 
   /**
-   * Trigger a browser download of a CSV string as a file.
-   *
-   * @param {string} csvString - The CSV content.
-   * @param {string} [filename='auditoria_cnpj.csv'] - Download file name.
+   * Download de string CSV como arquivo.
+   * @param {string} csvString
+   * @param {string} [filename]
    */
   function downloadCSV(csvString, filename = 'auditoria_cnpj.csv') {
     if (typeof csvString !== 'string' || csvString.length === 0) {
-      console.warn('downloadCSV: nothing to download.');
+      console.warn('downloadCSV: nada para baixar.');
       return;
     }
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
@@ -769,54 +1004,69 @@ const Utils = (function () {
   }
 
   /**
-   * Export results to XLSX using SheetJS and trigger download.
+   * Exporta resultados para XLSX via SheetJS.
    *
-   * @param {Array<Object>} results - The audit results to export.
-   * @param {string} filename - The file name to download.
+   * CORRIGIDO v2: a v1 lia campos inexistentes (r.cnpj, r.score, r.prioridade,
+   * r.internalData…) e gerava planilha de colunas vazias. Agora usa o schema
+   * real de generateAuditResult.
+   *
+   * @param {Array<Object>} results
+   * @param {string} [filename]
    */
   function exportToXLSX(results, filename = 'auditoria_cnpj.xlsx') {
     if (!window.XLSX) {
-      console.error('SheetJS (XLSX) library is not loaded.');
+      console.error('SheetJS (XLSX) não está carregado.');
+      return;
+    }
+    if (!Array.isArray(results) || results.length === 0) {
+      console.warn('exportToXLSX: nada para exportar.');
       return;
     }
 
-    const flatData = results.map(r => ({
-      CNPJ: r.cnpj,
-      Status_Geral: r.status_geral,
-      Status_Receita: r.status_receita,
-      Prioridade_Contato: r.prioridade,
-      Score_Reativacao: r.score,
-      Vendedor_Responsavel: r.vendedor_responsavel,
-      Recomendacao: r.recomendacao,
-      Divergencias: Array.isArray(r.divergences) ? r.divergences.join(', ') : '',
-      Interno_Razao_Social: r.internalData?.razao_social || '',
-      Receita_Razao_Social: r.officialData?.razao_social || '',
-      Interno_Nome_Fantasia: r.internalData?.nome_fantasia || '',
-      Receita_Nome_Fantasia: r.officialData?.nome_fantasia || '',
-      Interno_CEP: r.internalData?.cep || '',
-      Receita_CEP: r.officialData?.cep || '',
-      Interno_Endereço: r.internalData?.logradouro || '',
-      Receita_Endereço: [r.officialData?.logradouro, r.officialData?.numero].filter(Boolean).join(', '),
-      Interno_Município: r.internalData?.municipio || '',
-      Receita_Município: r.officialData?.municipio || '',
-      Interno_UF: r.internalData?.uf || '',
-      Receita_UF: r.officialData?.uf || '',
-      Interno_CNAE: r.internalData?.cnae || '',
-      Receita_CNAE: r.officialData?.cnae_fiscal_descricao || '',
-      Observacoes: r.observacoes || ''
-    }));
+    const flatData = results.map((r) => {
+      const rec = r.dados_completos_receita || {};
+      const bd = r.score_breakdown || {};
+      return {
+        CNPJ: r.cnpj_analisado ?? '',
+        Vendedor: r.vendedor ?? '',
+        Codigo_Cliente: r.codigo_cliente ?? '',
+        Classificacao: r.classificacao ?? '',
+        Prioridade: r.prioridade_geral ?? '',
+        Score_Oportunidade: r.score_oportunidade ?? r.score_vpa ?? '',
+        Score_Higiene: r.score_higiene ?? '',
+        Dias_Inativos: bd.diasInativos ?? '',
+        Porte: bd.porteDetectado ?? rec.porte ?? '',
+        Afinidade_CNAE: bd.scoreAfinidade ?? '',
+        Status_Receita: r.status_receita ?? '',
+        Acao_Recomendada: r.acao_recomendada ?? '',
+        Acao_Administrativa: r.acao_administrativa ?? '',
+        Divergencias: Array.isArray(r.divergencias)
+          ? r.divergencias.map((d) => d.campo_com_divergencia).join(', ')
+          : '',
+        Flags: Array.isArray(r.score_flags) ? r.score_flags.join(', ') : '',
+        Razao_Social: rec.razao_social ?? '',
+        Nome_Fantasia: rec.nome_fantasia ?? '',
+        Municipio: rec.municipio ?? '',
+        UF: rec.uf ?? '',
+        Telefone: rec.ddd_telefone_1 ?? '',
+        Email: rec.email ?? '',
+        CNAE_Principal: rec.cnae_fiscal_descricao ?? '',
+        Capital_Social: rec.capital_social ?? '',
+        Data_Inicio_Atividade: rec.data_inicio_atividade ?? '',
+        Data_Consulta: r.data_consulta ?? '',
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(flatData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Resultados_Auditoria");
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Resultados_Auditoria');
     XLSX.writeFile(workbook, filename);
   }
 
   /**
-   * Export full data state as a JSON file.
-   *
-   * @param {Object} data - The data state to export (usually { clients, results }).
-   * @param {string} filename - The file name to download.
+   * Exporta estado completo como JSON.
+   * @param {Object} data
+   * @param {string} [filename]
    */
   function exportToJSON(data, filename = 'auditoria_state.json') {
     const jsonString = JSON.stringify(data, null, 2);
@@ -825,11 +1075,7 @@ const Utils = (function () {
   }
 
   /**
-   * Generate and trigger download of a template CSV file.
-   *
-   * Headers: cnpj, razao_social, nome_fantasia, cep, logradouro,
-   * municipio, uf, cnae.
-   * Includes two example rows with placeholder data.
+   * Gera e baixa o CSV template de importação.
    */
   function downloadTemplateCSV() {
     const headers = [
@@ -841,6 +1087,9 @@ const Utils = (function () {
       'municipio',
       'uf',
       'cnae',
+      'ultcpr',
+      'vendedor',
+      'codigo',
     ];
 
     const exampleRows = [
@@ -852,7 +1101,10 @@ const Utils = (function () {
         'Rua Exemplo, 123',
         'São Paulo',
         'SP',
-        'Comércio varejista',
+        '4761-0/03',
+        '15/03/2024',
+        'CARLOS',
+        'C-1001',
       ],
       [
         '11.222.333/0001-81',
@@ -862,7 +1114,10 @@ const Utils = (function () {
         'Av. Rio Branco, 456',
         'Rio de Janeiro',
         'RJ',
-        'Consultoria em tecnologia',
+        '4647-8/01',
+        '02/11/2022',
+        'FERNANDA',
+        'C-2042',
       ],
     ];
 
@@ -875,39 +1130,24 @@ const Utils = (function () {
     downloadCSV(csv, 'template_auditoria_cnpj.csv');
   }
 
-  // ───────────────────────────────────────────────
-  // Formatting Helpers
-  // ───────────────────────────────────────────────
+  // ═══════════════════════════════════════════════
+  // Formatação / Timing
+  // ═══════════════════════════════════════════════
 
   /**
-   * Format a numeric value as Brazilian Real (BRL) currency.
-   *
-   * @example
-   * formatCurrency(1234567.89) // → 'R$ 1.234.567,89'
-   *
-   * @param {number|string} value - The numeric value.
-   * @returns {string} Formatted currency string or 'R$ 0,00' for invalid input.
+   * Formata número como BRL.
+   * @param {number|string} value
+   * @returns {string}
    */
   function formatCurrency(value) {
     const num = Number(value);
-    if (isNaN(num)) {
-      return 'R$ 0,00';
-    }
-
-    return num.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    });
+    if (isNaN(num)) return 'R$ 0,00';
+    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
 
-  // ───────────────────────────────────────────────
-  // Async / Timing Helpers
-  // ───────────────────────────────────────────────
-
   /**
-   * Return a Promise that resolves after the specified number of milliseconds.
-   *
-   * @param {number} ms - Milliseconds to wait.
+   * Promise que resolve após `ms` milissegundos.
+   * @param {number} ms
    * @returns {Promise<void>}
    */
   function sleep(ms) {
@@ -915,22 +1155,15 @@ const Utils = (function () {
   }
 
   /**
-   * Create a debounced version of a function.
-   *
-   * The returned function delays invoking `fn` until after `delay` milliseconds
-   * have elapsed since the last invocation.
-   *
-   * @param {Function} fn - The function to debounce.
-   * @param {number} delay - Delay in milliseconds.
-   * @returns {Function} Debounced function.
+   * Debounce: adia a execução até `delay` ms após a última chamada.
+   * @param {Function} fn
+   * @param {number} delay
+   * @returns {Function}
    */
   function debounce(fn, delay) {
     let timerId = null;
-
     return function (...args) {
-      if (timerId !== null) {
-        clearTimeout(timerId);
-      }
+      if (timerId !== null) clearTimeout(timerId);
       timerId = setTimeout(() => {
         timerId = null;
         fn.apply(this, args);
@@ -938,28 +1171,82 @@ const Utils = (function () {
     };
   }
 
-  // ───────────────────────────────────────────────
-  // Public API
-  // ───────────────────────────────────────────────
+  /**
+   * Throttle com trailing call — garante no MÁXIMO uma execução a cada
+   * `interval` ms, sempre executando a última chamada pendente.
+   *
+   * Uso recomendado no app.js: embrulhar a atualização de UI do onProgress
+   * para a renderização não disparar 10.000 reflows durante o batch:
+   *
+   *   const renderThrottled = Utils.throttle(renderProgressUI, 250);
+   *
+   * @param {Function} fn
+   * @param {number} interval
+   * @returns {Function}
+   */
+  function throttle(fn, interval) {
+    let last = 0;
+    let timerId = null;
+    let pendingArgs = null;
+
+    return function (...args) {
+      const now = Date.now();
+      pendingArgs = args;
+
+      const invoke = () => {
+        last = Date.now();
+        timerId = null;
+        fn.apply(this, pendingArgs);
+        pendingArgs = null;
+      };
+
+      if (now - last >= interval) {
+        if (timerId !== null) {
+          clearTimeout(timerId);
+          timerId = null;
+        }
+        invoke();
+      } else if (timerId === null) {
+        timerId = setTimeout(invoke, interval - (now - last));
+      }
+    };
+  }
+
+  // ═══════════════════════════════════════════════
+  // API pública
+  // ═══════════════════════════════════════════════
 
   return {
+    // CNPJ
     formatCNPJ,
     cleanCNPJ,
     validateCNPJ,
+    // Datas
+    parseDateFlexible,
+    // CSV
     parseCSV,
+    // Comparação
     normalizeForComparison,
     compareFields,
     generateDivergences,
+    // Scoring v2
+    SCORE_CONFIG,
+    calculateVpaScore,
+    detectPorte,
+    getCnaeAffinity,
     determinePriority,
     determineAction,
     generateAuditResult,
+    // Export
     exportToCSV,
     downloadCSV,
     exportToXLSX,
     exportToJSON,
     downloadTemplateCSV,
+    // Formatação / timing
     formatCurrency,
     sleep,
     debounce,
+    throttle,
   };
 })();
