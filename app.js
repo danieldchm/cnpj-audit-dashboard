@@ -58,6 +58,7 @@ const App = (function () {
     dom.searchInput = $('search-input');
     dom.filterStatus = $('filter-status');
     dom.filterPriority = $('filter-priority');
+    dom.filterVendedor = $('filter-vendedor');
     dom.tableCount = $('table-count');
     dom.tableBody = $('table-body');
     dom.tableWrapper = $('table-wrapper');
@@ -80,6 +81,8 @@ const App = (function () {
     dom.officialDataFields = $('official-data-fields');
     dom.brasilapiExtendedData = $('brasilapi-extended-data');
     dom.brasilapiQsaData = $('brasilapi-qsa-data');
+    dom.brasilapiContatoData = $('brasilapi-contato-data');
+    dom.brasilapiCnaesData = $('brasilapi-cnaes-data');
     dom.divergencesSection = $('divergences-section');
     dom.divergencesList = $('divergences-list');
     dom.webIntelStatus = $('web-intel-status');
@@ -137,6 +140,7 @@ const App = (function () {
     dom.searchInput.addEventListener('input', Utils.debounce(applyFilters, 300));
     dom.filterStatus.addEventListener('change', applyFilters);
     dom.filterPriority.addEventListener('change', applyFilters);
+    dom.filterVendedor.addEventListener('change', applyFilters);
 
     // Pagination
     dom.pageNext.addEventListener('click', () => goToPage(currentPage + 1));
@@ -278,6 +282,11 @@ const App = (function () {
           auditResult: null,
           error: null
         }));
+
+        // Populate Vendedor Filter
+        const vendedores = [...new Set(clients.map(c => c.vendedor).filter(Boolean))].sort();
+        dom.filterVendedor.innerHTML = '<option value="">Todos os Vendedores</option>' + 
+          vendedores.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
 
         // Update UI
         dom.uploadArea.classList.add('has-file');
@@ -607,6 +616,7 @@ const App = (function () {
     const searchTerm = dom.searchInput.value.toLowerCase().trim();
     const statusFilter = dom.filterStatus.value;
     const priorityFilter = dom.filterPriority.value;
+    const vendedorFilter = dom.filterVendedor.value;
 
     filteredIndices = [];
 
@@ -628,6 +638,9 @@ const App = (function () {
 
       // Priority filter
       if (priorityFilter && result.priority !== priorityFilter) continue;
+
+      // Vendedor filter
+      if (vendedorFilter && (client.vendedor || '') !== vendedorFilter) continue;
 
       filteredIndices.push(i);
     }
@@ -658,11 +671,15 @@ const App = (function () {
       const isHighlighted = result.priority === 'ALTA' || result.status === 'error';
       const isActive = idx === selectedIndex;
 
+      const diasInativos = result.auditResult?.score_breakdown?.diasInativos;
+      const inativoText = diasInativos >= 0 ? `${diasInativos} d` : '<span class="text-muted">—</span>';
+
       html += `<tr class="${isHighlighted ? 'highlighted' : ''} ${isActive ? 'active-row' : ''}" data-index="${idx}" onclick="App.openDetailPanel(${idx})">`;
       html += `<td class="row-num">${idx + 1}</td>`;
       html += `<td class="cnpj-cell">${Utils.formatCNPJ(client.cnpj)}</td>`;
       html += `<td class="razao-cell" title="${escapeHtml(client.razao_social)}">${escapeHtml(client.razao_social) || '<span class="text-muted">—</span>'}</td>`;
       html += `<td title="${escapeHtml(client.vendedor)}">${escapeHtml(client.vendedor) || '<span class="text-muted">—</span>'}</td>`;
+      html += `<td>${inativoText}</td>`;
       html += `<td>${renderStatusBadge(result.status)}</td>`;
       html += `<td>${result.priority ? renderPriorityBadge(result.priority) : '<span class="text-muted">—</span>'}</td>`;
       html += `<td>`;
@@ -841,6 +858,8 @@ const App = (function () {
       if (dom.brasilapiExtendedData) {
         dom.brasilapiExtendedData.innerHTML = '';
         dom.brasilapiQsaData.innerHTML = '';
+        if (dom.brasilapiContatoData) dom.brasilapiContatoData.innerHTML = '';
+        if (dom.brasilapiCnaesData) dom.brasilapiCnaesData.innerHTML = '';
       }
       dom.divergencesSection.classList.add('hidden');
       if (dom.commercialInsightsSection) dom.commercialInsightsSection.classList.add('hidden');
@@ -941,6 +960,38 @@ const App = (function () {
         `).join('');
       } else {
         dom.brasilapiQsaData.innerHTML = '<div class="text-muted text-sm">Nenhum sócio listado no QSA.</div>';
+      }
+
+      // Contact Data
+      if (dom.brasilapiContatoData) {
+        let contactHtml = '';
+        if (official.ddd_telefone_1) {
+          const tel1 = official.ddd_telefone_1;
+          contactHtml += `<div style="margin-bottom: 4px;">📞 <a href="tel:${tel1}" style="color: var(--cyan-400); text-decoration: none;">${escapeHtml(tel1)}</a></div>`;
+        }
+        if (official.ddd_telefone_2) {
+          const tel2 = official.ddd_telefone_2;
+          contactHtml += `<div style="margin-bottom: 4px;">📞 <a href="tel:${tel2}" style="color: var(--cyan-400); text-decoration: none;">${escapeHtml(tel2)}</a></div>`;
+        }
+        if (official.email) {
+          const email = official.email.toLowerCase();
+          contactHtml += `<div>✉️ <a href="mailto:${email}" style="color: var(--cyan-400); text-decoration: none;">${escapeHtml(email)}</a></div>`;
+        }
+        dom.brasilapiContatoData.innerHTML = contactHtml || '<div class="text-muted text-sm">Sem dados de contato.</div>';
+      }
+
+      // CNAEs Secundários
+      if (dom.brasilapiCnaesData) {
+        const cnaes = official.cnaes_secundarios;
+        if (Array.isArray(cnaes) && cnaes.length > 0) {
+          dom.brasilapiCnaesData.innerHTML = cnaes.map(c => `
+            <div style="font-size: 0.8rem; padding: 4px 0; border-bottom: 1px dashed var(--border-subtle); color: var(--text-secondary);">
+              ${c.codigo} - ${escapeHtml(c.descricao)}
+            </div>
+          `).join('');
+        } else {
+          dom.brasilapiCnaesData.innerHTML = '<div class="text-muted text-sm">Sem CNAEs secundários.</div>';
+        }
       }
     }
 
