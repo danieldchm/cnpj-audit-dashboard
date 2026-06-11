@@ -298,33 +298,39 @@ const API = (function () {
 
     const results = [];
 
+    const concurrency = options.concurrency || 20;
+
     try {
-      for (let i = 0; i < clients.length; i++) {
-        // Check cancellation
-        if (_cancelFlag) {
-          console.info(
-            `processBatch: cancelled at index ${i}/${clients.length}.`
-          );
-          break;
-        }
+      let currentIndex = 0;
+      let completedCount = 0;
 
-        const result = await processClient(clients[i]);
-        results.push(result);
+      const workers = Array.from({ length: concurrency }, async () => {
+        while (currentIndex < clients.length) {
+          if (_cancelFlag) break;
 
-        // Notify caller
-        if (typeof onProgress === 'function') {
-          try {
-            onProgress(i, clients.length, result);
-          } catch (cbErr) {
-            console.error('processBatch: onProgress callback error:', cbErr);
+          const i = currentIndex++;
+          const client = clients[i];
+          
+          const result = await processClient(client);
+          results[i] = result;
+          completedCount++;
+
+          if (typeof onProgress === 'function') {
+            try {
+              onProgress(i, clients.length, result);
+            } catch (cbErr) {
+              console.error('processBatch: onProgress callback error:', cbErr);
+            }
+          }
+
+          if (delayMs > 0 && !_cancelFlag) {
+            await Utils.sleep(delayMs);
           }
         }
+      });
 
-        // Delay between requests (skip after last one)
-        if (i < clients.length - 1 && !_cancelFlag && delayMs > 0) {
-          await Utils.sleep(delayMs);
-        }
-      }
+      await Promise.all(workers);
+
     } finally {
       _batchRunning = false;
       _cancelFlag = false;

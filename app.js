@@ -933,12 +933,12 @@ const App = (function () {
       // QSA Data
       const qsa = official.qsa;
       if (Array.isArray(qsa) && qsa.length > 0) {
-        dom.brasilapiQsaData.innerHTML = qsa.map(s => \`
+        dom.brasilapiQsaData.innerHTML = qsa.map(s => `
           <div style="font-size: 0.85rem; padding: 4px 0; border-bottom: 1px dashed var(--border-subtle); display: flex; justify-content: space-between;">
-            <span>\${escapeHtml(s.nome_socio)}</span>
-            <span style="color: var(--text-muted);">\${escapeHtml(s.qualificacao_socio)}</span>
+            <span>${escapeHtml(s.nome_socio)}</span>
+            <span style="color: var(--text-muted);">${escapeHtml(s.qualificacao_socio)}</span>
           </div>
-        \`).join('');
+        `).join('');
       } else {
         dom.brasilapiQsaData.innerHTML = '<div class="text-muted text-sm">Nenhum sócio listado no QSA.</div>';
       }
