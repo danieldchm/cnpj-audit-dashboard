@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AuditBase — Dashboard de Auditoria Cadastral de CNPJs</title>
+  <meta name="description" content="Dashboard inteligente para auditoria e higienização de base cadastral de CNPJs com integração à Receita Federal">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🛡️</text></svg>">
+</head>
+<body>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <div class="header-logo">
+        <svg class="logo-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="url(#logo-gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <defs>
+            <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#60a5fa"/>
+              <stop offset="100%" style="stop-color:#a78bfa"/>
+            </linearGradient>
+          </defs>
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+        <h1>AuditBase</h1>
+        <span class="header-badge">Protótipo v1.0</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-export" id="btn-export" disabled title="Exportar resultados processados">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exportar CSV
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="container">
+
+    <!-- Upload Section -->
+    <section class="upload-section" id="upload-section">
+      <span class="section-title">📁 Importação de Dados</span>
+      <div class="upload-area" id="upload-area">
+        <div class="upload-icon">📂</div>
+        <div class="upload-text">
+          <strong>Arraste seu arquivo CSV ou XLSX aqui</strong><br>
+          ou clique para selecionar
+        </div>
+        <div class="upload-formats">Formatos aceitos: .csv (UTF-8) e .xlsx (Excel)</div>
+        <input type="file" id="file-input" class="file-input" accept=".csv,.xlsx,.xls">
+      </div>
+      <div class="file-info hidden" id="file-info">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green-400)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div>
+          <div class="file-name" id="file-name"></div>
+          <div class="file-size" id="file-size"></div>
+        </div>
+        <button class="file-remove" id="file-remove" title="Remover arquivo">✕</button>
+      </div>
+      <div class="template-download">
+        <button class="btn btn-secondary btn-sm" id="btn-template">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Baixar Template CSV
+        </button>
+      </div>
+    </section>
+
+    <!-- Config Bar -->
+    <div class="config-bar" id="config-bar">
+      <div class="mode-toggle">
+        <input type="radio" id="mode-batch" name="mode" value="batch" checked>
+        <label for="mode-batch">🔄 Em Lote (Batch)</label>
+        <input type="radio" id="mode-unit" name="mode" value="unit">
+        <label for="mode-unit">🎯 Unitário</label>
+      </div>
+
+      <div class="cnpj-input-wrapper hidden" id="cnpj-input-wrapper">
+        <input type="text" class="cnpj-input" id="cnpj-direct-input" placeholder="00.000.000/0001-00" maxlength="18">
+        <button class="btn btn-primary btn-sm" id="btn-search-cnpj" title="Consultar CNPJ">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Consultar
+        </button>
+      </div>
+
+      <div class="config-actions">
+        <button class="btn btn-primary" id="btn-process" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span id="btn-process-text">Iniciar Processamento</span>
+        </button>
+        <button class="btn btn-secondary hidden" id="btn-cancel">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+          Parar
+        </button>
+      </div>
+    </div>
+
+    <!-- Metrics Section -->
+    <section class="metrics-section" id="metrics-section">
+      <div class="metric-card total">
+        <div class="metric-icon">📊</div>
+        <div class="metric-value" id="metric-total">0</div>
+        <div class="metric-label">Total de Clientes</div>
+      </div>
+      <div class="metric-card processed">
+        <div class="metric-icon">⏳</div>
+        <div class="metric-value" id="metric-processed">0</div>
+        <div class="metric-label">Processados</div>
+        <div class="metric-sublabel" id="metric-processed-pct"></div>
+      </div>
+      <div class="metric-card active">
+        <div class="metric-icon">✅</div>
+        <div class="metric-value" id="metric-active">0</div>
+        <div class="metric-label">Ativos sem Divergência</div>
+      </div>
+      <div class="metric-card divergent">
+        <div class="metric-icon">⚠️</div>
+        <div class="metric-value" id="metric-divergent">0</div>
+        <div class="metric-label">Com Divergência</div>
+      </div>
+      <div class="metric-card critical">
+        <div class="metric-icon">🚫</div>
+        <div class="metric-value" id="metric-critical">0</div>
+        <div class="metric-label">Inativos / Críticos</div>
+      </div>
+      <div class="metric-card health">
+        <div class="metric-icon">💚</div>
+        <div class="metric-value" id="metric-health">—</div>
+        <div class="metric-label">Saúde da Base</div>
+        <div class="health-bar">
+          <div class="health-bar-fill" id="health-bar-fill" style="width: 0%"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Progress Section -->
+    <div class="progress-section" id="progress-section">
+      <div class="progress-bar-container">
+        <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+      </div>
+      <div class="progress-info">
+        <span id="progress-current">Processando...</span>
+        <span id="progress-eta">Estimativa: calculando...</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content" id="main-content">
+
+      <!-- Table Section -->
+      <section class="table-section">
+        <!-- Table Controls -->
+        <div class="table-controls">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" class="search-input" id="search-input" placeholder="Buscar por CNPJ ou Razão Social...">
+          </div>
+          <select class="filter-select" id="filter-status">
+            <option value="">Todos os Status</option>
+            <option value="pending">⏸ Pendente</option>
+            <option value="processing">🔄 Processando</option>
+            <option value="success">✅ Sucesso</option>
+            <option value="divergence">⚠️ Divergência</option>
+            <option value="error">❌ Erro</option>
+          </select>
+          <select class="filter-select" id="filter-priority">
+            <option value="">Todas as Prioridades</option>
+            <option value="ALTA">🔴 Alta</option>
+            <option value="MEDIA">🟡 Média</option>
+            <option value="BAIXA">🟢 Baixa</option>
+            <option value="NENHUMA">⚪ Nenhuma</option>
+          </select>
+          <div class="table-count" id="table-count"></div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="table-wrapper" id="table-wrapper">
+          <table id="data-table">
+            <thead>
+              <tr>
+                <th class="w-16">#</th>
+                <th>CNPJ</th>
+                <th>Razão Social</th>
+                <th>Vendedor</th>
+                <th>Status</th>
+                <th>Prioridade</th>
+                <th class="w-24">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+            </tbody>
+          </table>
+
+          <!-- Empty State -->
+          <div class="empty-state" id="empty-state">
+            <div class="empty-icon">📋</div>
+            <div class="empty-text">Importe um arquivo CSV para começar a auditoria</div>
+            <div class="empty-subtext">Utilize o template para garantir a formatação correta dos dados</div>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination hidden" id="pagination">
+          <button class="pagination-btn" id="page-prev" title="Página anterior">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="pagination-pages" id="pagination-pages"></div>
+          <button class="pagination-btn" id="page-next" title="Próxima página">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <span class="pagination-info" id="pagination-info"></span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Detail Panel Overlay -->
+  <div class="detail-overlay" id="detail-overlay"></div>
+
+  <!-- Detail Panel -->
+  <aside class="detail-panel" id="detail-panel">
+    <div class="detail-header">
+      <div>
+        <div class="detail-title" id="detail-title">—</div>
+        <div class="detail-subtitle" id="detail-cnpj">—</div>
+      </div>
+      <button class="detail-close" id="detail-close" title="Fechar painel">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Status Badge in detail -->
+    <div class="detail-status-row" id="detail-status-row">
+      <span class="status-badge" id="detail-status-badge"></span>
+      <span class="priority-badge" id="detail-priority-badge"></span>
+    </div>
+
+    <!-- Recommendation Card -->
+    <div class="recommendation-card" id="recommendation-card">
+      <div class="rec-label">🤖 Recomendação da IA</div>
+      <div class="rec-text" id="rec-text">—</div>
+    </div>
+
+    <!-- Data Comparison -->
+    <div class="detail-section">
+      <div class="detail-section-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        Cruzamento de Dados
+      </div>
+      <div class="comparison-grid">
+        <div class="data-block internal">
+          <div class="data-block-title">📋 Dados Internos</div>
+          <div id="internal-data-fields"></div>
+        </div>
+        <div class="data-block official">
+          <div class="data-block-title">🏛️ Receita Federal</div>
+          <div id="official-data-fields"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divergences Summary -->
+    <div class="detail-section" id="divergences-section">
+      <div class="detail-section-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--yellow-400)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Divergências Encontradas
+      </div>
+      <div id="divergences-list"></div>
+    </div>
+
+    <!-- Web Intelligence -->
+    <div class="detail-section">
+      <div class="detail-section-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-500)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Inteligência Web
+      </div>
+      <div class="web-intel-card" id="web-intel-card">
+        <div class="web-intel-status" id="web-intel-status"></div>
+        <a class="web-intel-link" id="web-intel-link" href="#" target="_blank" rel="noopener"></a>
+        <div class="web-intel-summary" id="web-intel-summary">—</div>
+      </div>
+    </div>
+
+    <!-- Full Receita Data Accordion -->
+    <div class="detail-section">
+      <div class="detail-section-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Dados Completos da Receita
+      </div>
+      <div class="accordion">
+        <button class="accordion-header" id="accordion-header">
+          <span>Expandir JSON completo</span>
+          <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="accordion-body" id="accordion-body">
+          <div class="accordion-body-content">
+            <pre id="receita-json">—</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- SheetJS for XLSX support (loaded from CDN) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+  <!-- Scripts (order matters: utils → api → app) -->
+  <script src="utils.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
