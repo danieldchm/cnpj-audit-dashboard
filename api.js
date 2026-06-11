@@ -149,49 +149,33 @@ const API = (function () {
       return {
         indicios_de_operacao_ativa: false,
         link_principal_encontrado: null,
-        resumo_da_atuacao: 'Não foi possível gerar inteligência web: dados oficiais indisponíveis.',
+        resumo_da_atuacao: 'Dados oficiais indisponíveis.',
       };
     }
 
-    const situacao = (
-      officialData.descricao_situacao_cadastral ?? ''
-    ).toUpperCase();
+    const situacao = (officialData.descricao_situacao_cadastral ?? '').toUpperCase();
     const isAtiva = situacao === 'ATIVA';
+    const capital = parseFloat(officialData.capital_social) || 0;
+    const temTelefone = !!officialData.ddd_telefone_1;
+    const temEmail = !!officialData.email;
 
-    // --- Build a plausible URL from nome_fantasia ---
-    let link = null;
-    if (isAtiva) {
-      const nomeFantasia = (officialData.nome_fantasia ?? '').trim();
-      if (nomeFantasia) {
-        const slug = nomeFantasia
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '') // strip accents
-          .replace(/[^a-z0-9]+/g, '')       // keep only alphanum
-          .slice(0, 30);
-        if (slug.length > 0) {
-          link = `https://www.${slug}.com.br`;
-        }
-      }
-    }
+    // Sinal baseado em dados reais da Receita Federal — não inferimos URLs
+    const indiciosAtivo = isAtiva && capital > 0;
 
-    // --- Build resumo from CNAE and razao_social ---
-    const cnae = (officialData.cnae_fiscal_descricao ?? '').trim();
-    const razao = (officialData.razao_social ?? '').trim();
-
-    let resumo;
-    if (cnae && razao) {
-      resumo = `Empresa atuante no segmento de ${cnae}. Razão Social: ${razao}.`;
-    } else if (razao) {
-      resumo = `Razão Social: ${razao}. Segmento de atuação não identificado.`;
-    } else {
-      resumo = 'Informações insuficientes para gerar resumo de atuação.';
-    }
+    const partes = [
+      officialData.cnae_fiscal_descricao ? `Segmento: ${officialData.cnae_fiscal_descricao}` : null,
+      (officialData.municipio && officialData.uf) ? `Local: ${officialData.municipio}/${officialData.uf}` : null,
+      capital > 0
+        ? `Capital: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(capital)}`
+        : null,
+      temTelefone ? `Tel RF: ${officialData.ddd_telefone_1}` : 'Sem telefone na RF',
+      temEmail ? `E-mail RF: ${officialData.email}` : 'Sem e-mail na RF',
+    ].filter(Boolean).join(' · ');
 
     return {
-      indicios_de_operacao_ativa: isAtiva,
-      link_principal_encontrado: link,
-      resumo_da_atuacao: resumo,
+      indicios_de_operacao_ativa: indiciosAtivo,
+      link_principal_encontrado: null,
+      resumo_da_atuacao: partes || 'Sem informações adicionais disponíveis.',
     };
   }
 
@@ -219,7 +203,7 @@ const API = (function () {
         cadastro_valido: false,
         divergencias: [],
         num_divergencias: 0,
-        prioridade_geral: 'ALTA',
+        prioridade_geral: 'DESCARTE',
         acao_recomendada: 'CNPJ não informado no registro.',
         dados_completos_receita: null,
         inteligencia_web: null,
@@ -239,7 +223,7 @@ const API = (function () {
         cadastro_valido: false,
         divergencias: [],
         num_divergencias: 0,
-        prioridade_geral: 'ALTA',
+        prioridade_geral: 'DESCARTE',
         acao_recomendada: `Erro na consulta: ${officialData.message}`,
         dados_completos_receita: null,
         inteligencia_web: null,

@@ -557,16 +557,24 @@ const Utils = (function () {
     let diasInativos = -1;
     let scoreRecencia = null; // null = indisponível (peso será redistribuído)
 
-    const ultCprDate = parseDateFlexible(internalData?.ultcpr);
-    if (ultCprDate) {
-      const diffMs = Date.now() - ultCprDate.getTime();
+    // Tenta ultcpr primeiro; cai para datmaicpr (data maior compra) como fallback
+    let recenciaDate = parseDateFlexible(internalData?.ultcpr);
+    let recenciaFonte = 'ultcpr';
+    if (!recenciaDate && internalData?.datmaicpr) {
+      recenciaDate = parseDateFlexible(internalData.datmaicpr);
+      recenciaFonte = 'datmaicpr';
+    }
+
+    if (recenciaDate) {
+      const diffMs = Date.now() - recenciaDate.getTime();
       if (diffMs < 0) {
-        flags.push('DATA_ULTIMA_COMPRA_FUTURA'); // erro de digitação no ERP
+        flags.push('DATA_ULTIMA_COMPRA_FUTURA');
       } else {
         diasInativos = Math.floor(diffMs / 86400000);
         scoreRecencia = Math.round(100 * Math.exp(-diasInativos / cfg.recenciaTauDias));
+        if (recenciaFonte === 'datmaicpr') flags.push('RECENCIA_POR_DATA_MAIOR_COMPRA');
       }
-    } else if (internalData?.ultcpr) {
+    } else if (internalData?.ultcpr || internalData?.datmaicpr) {
       flags.push('DATA_ULTIMA_COMPRA_ILEGIVEL');
     } else {
       flags.push('SEM_DATA_ULTIMA_COMPRA');
@@ -644,6 +652,30 @@ const Utils = (function () {
     let classification, priority, action, color;
     let acaoAdministrativa = null;
 
+    // Ângulo de abordagem contextualizado por segmento CNAE
+    const cnaeDesc = String(officialData?.cnae_fiscal_descricao ?? '').toUpperCase();
+    let segmento = 'geral';
+    if (/PAPELARIA/.test(cnaeDesc)) segmento = 'papelaria';
+    else if (/LIVRAR|LIVROS/.test(cnaeDesc)) segmento = 'livraria';
+    else if (/ESCOLA|ENSINO|EDUCA/.test(cnaeDesc)) segmento = 'educacao';
+    else if (/GR[AÁ]FICA|IMPRESS/.test(cnaeDesc)) segmento = 'grafica';
+    else if (/ESCRIT[OÓ]RIO/.test(cnaeDesc)) segmento = 'escritorio';
+    else if (/ARMARINHO/.test(cnaeDesc)) segmento = 'armarinho';
+
+    const anglesMap = {
+      papelaria:   'reposição de papelaria (cadernos, lápis, canetas)',
+      livraria:    'mix papelaria + materiais educativos',
+      educacao:    'kit material escolar e suprimentos para secretaria',
+      grafica:     'papel offset, A4 e insumos gráficos',
+      escritorio:  'papelaria corporativa e materiais de escritório',
+      armarinho:   'linha de armarinho e correlatos da casa',
+      geral:       'portfólio completo (papelaria, escritório, educacional)',
+    };
+    const angle = anglesMap[segmento];
+    const recStr = diasInativos >= 0
+      ? `cliente inativo há ${diasInativos} dias`
+      : 'sem histórico de compra registrado';
+
     if (gateKey === 'BAIXADA' || gateKey === 'NULA') {
       classification = '🔴 DESCARTE / ARQUIVO';
       priority = 'DESCARTE';
@@ -653,36 +685,34 @@ const Utils = (function () {
     } else if (gateKey === 'INAPTA') {
       classification = '🟣 INAPTA — REGULARIZÁVEL';
       priority = 'BAIXA';
-      action =
-        'Situação regularizável junto à Receita. Vendedor pode usar como gancho: ' +
-        '"vimos uma pendência no CNPJ de vocês". Reavaliar após regularização.';
+      action = `Situação regularizável (RF). Gancho comercial: informar a pendência cadastral e oferecer suporte — retomar fornecimento de ${angle} após regularização. Não faturar até normalização.`;
       acaoAdministrativa = 'SUSPENDER FATURAMENTO até regularização';
       color = 'purple';
     } else if (gateKey === 'SUSPENSA') {
       classification = '🟠 SUSPENSA — MONITORAR';
       priority = 'BAIXA';
-      action = 'Não abordar agora. Monitorar mudança de situação cadastral.';
+      action = 'Não abordar. Monitorar retorno à situação ATIVA.';
       acaoAdministrativa = 'SUSPENDER FATURAMENTO até regularização';
       color = 'orange';
     } else if (scoreOportunidade >= cfg.thresholds.quente) {
       classification = '🟢 OPORTUNIDADE QUENTE';
       priority = 'ALTA';
-      action = 'Ligação direta do vendedor nas próximas 48h.';
+      action = `Ligação direta nas próximas 48h. Ângulo: ${angle}. ${recStr.charAt(0).toUpperCase() + recStr.slice(1)}.`;
       color = 'green';
     } else if (scoreOportunidade >= cfg.thresholds.alto) {
       classification = '🔵 POTENCIAL ALTO';
       priority = 'MEDIA';
-      action = 'SDR: agendar contato + WhatsApp com catálogo Distribuidora.';
+      action = `SDR: WhatsApp + catálogo digital. Destaque: ${angle}. ${recStr.charAt(0).toUpperCase() + recStr.slice(1)}.`;
       color = 'blue';
     } else if (scoreOportunidade >= cfg.thresholds.moderado) {
       classification = '🟡 POTENCIAL MODERADO';
       priority = 'MEDIA';
-      action = 'Campanha de e-mail marketing / nutrição.';
+      action = `Cadência de e-mail 30/60/90 dias. Tema: ${angle}.`;
       color = 'yellow';
     } else {
       classification = '⚪ BAIXA PRIORIDADE';
       priority = 'BAIXA';
-      action = 'Fila de nutrição de longo prazo. Reavaliar no próximo ciclo.';
+      action = `Nutrição de longo prazo. Reavaliar no próximo ciclo.`;
       color = 'gray';
     }
 
@@ -704,6 +734,7 @@ const Utils = (function () {
       breakdown: {
         diasInativos,
         scoreRecencia: scoreRecencia ?? 'N/D',
+        recenciaFonte: recenciaFonte,
         scorePorte,
         porteDetectado: porte,
         scoreAfinidade,

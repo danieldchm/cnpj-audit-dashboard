@@ -418,6 +418,7 @@ const App = (function () {
         showToast(`Erro: ${result._errorMessage || 'Falha na consulta'}`, 'error');
       } else {
         const status = result.divergencias && result.divergencias.length > 0 ? 'divergence' : 'success';
+        result.vendedor = clients[0]?.vendedor || '';
         results[0] = { status, priority: result.prioridade_geral, auditResult: result, error: null };
         // Update internal data from official if empty
         if (!clientData.razao_social && result.dados_completos_receita) {
@@ -497,11 +498,12 @@ const App = (function () {
       };
     } else {
       const hasDivergence = result.divergencias && result.divergencias.length > 0;
-      const isInactive = result.status_receita !== 'ATIVA';
+      const isInactive = result.status_receita !== 'ATIVA' && result.status_receita !== 'ERRO';
       let status = 'success';
-      if (isInactive) status = 'error';
+      if (isInactive) status = 'inactive';
       else if (hasDivergence) status = 'divergence';
 
+      result.vendedor = clients[index]?.vendedor || '';
       results[index] = {
         status,
         priority: result.prioridade_geral,
@@ -580,8 +582,7 @@ const App = (function () {
     const active = results.filter(r => r.status === 'success').length;
     const divergent = results.filter(r => r.status === 'divergence').length;
     const critical = results.filter(r =>
-      r.status === 'error' ||
-      (r.auditResult && r.auditResult.status_receita !== 'ATIVA')
+      r.status === 'error' || r.status === 'inactive'
     ).length;
 
     animateCounter(dom.metricTotal, total);
@@ -683,7 +684,7 @@ const App = (function () {
     for (const idx of pageIndices) {
       const client = clients[idx];
       const result = results[idx];
-      const isHighlighted = result.priority === 'ALTA' || result.status === 'error';
+      const isHighlighted = result.priority === 'ALTA' || result.status === 'error' || result.status === 'inactive';
       const isActive = idx === selectedIndex;
 
       const diasInativos = result.auditResult?.score_breakdown?.diasInativos;
@@ -722,11 +723,12 @@ const App = (function () {
 
   function renderStatusBadge(status) {
     const config = {
-      pending: { label: 'Pendente', icon: '' },
-      processing: { label: 'Processando', icon: '' },
-      success: { label: 'Sucesso', icon: '' },
-      divergence: { label: 'Divergência', icon: '' },
-      error: { label: 'Erro', icon: '' }
+      pending:    { label: 'Pendente' },
+      processing: { label: 'Processando' },
+      success:    { label: 'Sucesso' },
+      divergence: { label: 'Divergência' },
+      inactive:   { label: 'Inativo' },
+      error:      { label: 'Erro API' },
     };
     const c = config[status] || config.pending;
     return `<span class="status-badge ${status}"><span class="status-dot"></span>${c.label}</span>`;
@@ -803,11 +805,12 @@ const App = (function () {
         results[index] = { status: 'error', priority: null, auditResult: null, error: result._errorMessage || 'Erro' };
       } else {
         const hasDivergence = result.divergencias && result.divergencias.length > 0;
-        const isInactive = result.status_receita !== 'ATIVA';
+        const isInactive = result.status_receita !== 'ATIVA' && result.status_receita !== 'ERRO';
         let status = 'success';
-        if (isInactive) status = 'error';
+        if (isInactive) status = 'inactive';
         else if (hasDivergence) status = 'divergence';
 
+        result.vendedor = clients[index]?.vendedor || '';
         results[index] = { status, priority: result.prioridade_geral, auditResult: result, error: null };
 
         // Enrich
@@ -882,7 +885,7 @@ const App = (function () {
         dom.detailPriorityBadge.classList.add('hidden');
       }
     } else {
-      dom.detailStatusRow.classList.add('hidden');
+      if (dom.detailStatusRow) dom.detailStatusRow.classList.add('hidden');
     }
 
     if (!audit) {
@@ -1095,7 +1098,9 @@ const App = (function () {
       { label: 'Endereço', value: client.logradouro },
       { label: 'Município', value: client.municipio },
       { label: 'UF', value: client.uf },
-      { label: 'CNAE', value: client.cnae }
+      { label: 'CNAE', value: client.cnae },
+      { label: 'Última Compra (ultcpr)', value: client.ultcpr },
+      { label: 'Data Maior Compra (datmaicpr)', value: client.datmaicpr },
     ];
   }
 

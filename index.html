@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AuditBase — Dashboard de Auditoria Cadastral de CNPJs</title>
+  <title>AuditBase | Distribuidora Atacadista — Dashboard de Auditoria Cadastral de CNPJs</title>
   <meta name="description" content="Dashboard inteligente para auditoria e higienização de base cadastral de CNPJs com integração à Receita Federal">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,6 +31,8 @@
           <path d="M9 12l2 2 4-4"/>
         </svg>
         <h1>AuditBase</h1>
+        <span class="brand-divider">|</span>
+        <span class="brand-subname">Distribuidora Atacadista</span>
         <span class="header-badge">Protótipo v2.0</span>
       </div>
       <div class="header-actions">
@@ -183,6 +185,10 @@
         </div>
 
         <div class="needs-data hidden">
+          <div class="dashboard-header" style="margin-bottom: 24px;">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">Dashboard Analítico — Distribuidora Atacadista</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Análise consolidada e sanitização de clientes inativos</p>
+          </div>
           <!-- KPIs estratégicos -->
           <div class="kpi-row">
             <div class="kpi-card potencial">
@@ -237,7 +243,8 @@
             <option value="processing">🔄 Processando</option>
             <option value="success">✅ Sucesso</option>
             <option value="divergence">⚠️ Divergência</option>
-            <option value="error">❌ Erro</option>
+            <option value="inactive">🔶 Inativo (RF)</option>
+            <option value="error">❌ Erro API</option>
           </select>
           <select class="filter-select" id="filter-priority">
             <option value="">Todas as Prioridades</option>
@@ -303,6 +310,10 @@
         </div>
 
         <div class="needs-data hidden">
+          <div class="dashboard-header" style="margin-bottom: 24px;">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">Inferências e Cruzamentos — Distribuidora Atacadista</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Sinais acionáveis, grupos econômicos e rede de sócios da carteira</p>
+          </div>
           <div class="intel-block">
             <div class="intel-head">📈 Scorecard por Vendedor</div>
             <div class="intel-sub">Saúde da carteira, oportunidades quentes e concentração de capital por responsável.</div>
@@ -347,15 +358,28 @@
           <div class="empty-subtext">Lista ordenada por prioridade e score, pronta para distribuir ao time comercial.</div>
         </div>
         <div class="needs-data hidden">
+          <div class="dashboard-header" style="margin-bottom: 24px;">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">Plano de Ação Comercial</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Fila priorizada de reativação para vendedores e SDRs da distribuidora</p>
+          </div>
           <div class="plano-controls">
             <select class="filter-select" id="plano-vendedor"><option value="">Todos os vendedores</option></select>
             <span class="plano-count" id="plano-count"></span>
+            <label class="threshold-control">
+              Score mín.: <strong id="threshold-val">35</strong>
+              <input type="range" id="threshold-slider" min="0" max="90" value="35" step="5" class="threshold-slider">
+            </label>
             <button class="btn btn-secondary btn-sm" id="plano-export">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Exportar fila (CSV)
             </button>
           </div>
           <div id="plano-table"></div>
+          <div class="plano-inapta-section intel-block accent-purple" style="margin-top:24px;">
+            <div class="intel-head">🟣 INAPTAS — Gancho Comercial (regularizável)</div>
+            <div class="intel-sub">Empresas com CNPJ inapto junto à Receita Federal. Situação regularizável — aborde o sócio com o problema antes de oferecer produto.</div>
+            <div id="plano-inaptas"></div>
+          </div>
         </div>
       </section>
     </main>
@@ -388,6 +412,7 @@
       <div class="rec-label">🤖 Recomendação da IA</div>
       <div class="rec-text" id="rec-text">—</div>
     </div>
+      <div id="commercial-insights-section">
       <div class="detail-section-title">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-500)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
         Insights Comerciais Distribuidora
@@ -416,6 +441,7 @@
           <!-- Populated dynamically -->
         </div>
       </div>
+      </div><!-- /#commercial-insights-section -->
     </div>
 
     <!-- Data Comparison -->
@@ -469,7 +495,7 @@
     <div class="detail-section">
       <div class="detail-section-title">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-500)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        Inteligência Web
+        Perfil Operacional (Receita Federal)
       </div>
       <div class="web-intel-card" id="web-intel-card">
         <div class="web-intel-status" id="web-intel-status"></div>

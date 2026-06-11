@@ -390,10 +390,11 @@ const Insights = (function () {
       const cap = _capital(rec);
 
       // Oportunidade dormente: empresa boa (afinidade+porte) mas comprou há muito tempo
+      // Threshold de porte 40 para incluir MEI (ICP da distribuidora = pequeno varejo)
       if (
         ativo &&
         (bd.scoreAfinidade ?? 0) >= 60 &&
-        (bd.scorePorte ?? 0) >= 70 &&
+        (bd.scorePorte ?? 0) >= 40 &&
         bd.diasInativos != null &&
         bd.diasInativos >= 365
       ) {
@@ -454,29 +455,40 @@ const Insights = (function () {
   // ───────────────────────────────────────────────
 
   function planoAcao(valid) {
-    const fila = valid
-      .map((r) => {
-        const a = r.auditResult;
-        const rec = a.dados_completos_receita;
-        return {
-          cnpj: a.cnpj_analisado,
-          razao: rec.razao_social || a.cnpj_analisado,
-          vendedor: a.vendedor || '—',
-          prioridade: a.prioridade_geral,
-          classificacao: a.classificacao,
-          score: a.score_oportunidade ?? a.score_vpa ?? 0,
-          higiene: a.score_higiene ?? 0,
-          acao: a.acao_recomendada,
-          telefone: rec.ddd_telefone_1 || '',
-          situacao: _situacao(rec),
-        };
-      })
-      .filter((x) => x.prioridade === 'ALTA' || x.prioridade === 'MEDIA')
+    const todos = valid.map((r) => {
+      const a = r.auditResult;
+      const rec = a.dados_completos_receita;
+      const qsa = Array.isArray(rec.qsa) ? rec.qsa : [];
+      const socio = qsa.length > 0 ? (qsa[0].nome_socio || qsa[0].nome || '') : '';
+      return {
+        cnpj: a.cnpj_analisado,
+        razao: rec.razao_social || a.cnpj_analisado,
+        vendedor: a.vendedor || '—',
+        prioridade: a.prioridade_geral,
+        classificacao: a.classificacao,
+        score: a.score_oportunidade ?? a.score_vpa ?? 0,
+        higiene: a.score_higiene ?? 0,
+        acao: a.acao_recomendada,
+        telefone: rec.ddd_telefone_1 || '',
+        situacao: _situacao(rec),
+        socio,
+      };
+    });
+
+    // Fila principal: todas as empresas ATIVAS (ALTA + MEDIA + BAIXA), ordenadas por score
+    const fila = todos
+      .filter((x) => x.situacao === 'ATIVA')
       .sort((a, b) => {
-        const rank = { ALTA: 0, MEDIA: 1 };
-        return (rank[a.prioridade] - rank[b.prioridade]) || b.score - a.score;
+        const rank = { ALTA: 0, MEDIA: 1, BAIXA: 2, NENHUMA: 3, DESCARTE: 4 };
+        return (rank[a.prioridade] ?? 9) - (rank[b.prioridade] ?? 9) || b.score - a.score;
       });
-    return fila;
+
+    // Fila secundária: INAPTAS (regularizáveis — gancho comercial)
+    const inaptas = todos
+      .filter((x) => x.situacao === 'INAPTA')
+      .sort((a, b) => b.score - a.score);
+
+    return { fila, inaptas };
   }
 
   // ───────────────────────────────────────────────
