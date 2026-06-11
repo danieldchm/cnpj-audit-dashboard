@@ -1,11 +1,11 @@
-cnpj,razao_social,nome_fantasia,cep,logradouro,municipio,uf,cnae
-33000167000101,PETROLEO BRASILEIRO S.A.,PETROBRAS,20031912,Avenida Republica do Chile 65,Rio de Janeiro,RJ,Extração de petróleo e gás natural
-33592510000154,VALE S.A.,VALE,20020906,Praia de Botafogo 186,Rio de Janeiro,RJ,Extração de minério de ferro
-47960950000121,MAGAZINE LUIZA S.A.,MAGALU,01311300,Rua Padre Joao Manuel 600,Sao Paulo,SP,Comércio varejista
-07526557000100,AMBEV S.A.,AMBEV,04578000,Rua Dr Renato Paes de Barros 1017,Sao Paulo,SP,Fabricação de cervejas
-60701190000104,ITAU UNIBANCO HOLDING S.A.,ITAU UNIBANCO,04538132,Praca Alfredo Egydio de Souza Aranha 100,Sao Paulo,SP,Bancos múltiplos
-09346601000125,B3 S.A. - BRASIL BOLSA BALCAO,B3,04538132,Rua Quinze de Novembro 275,Sao Paulo,SP,Administração de bolsas
-84429695000111,WEG S.A.,WEG,89256900,Avenida Prefeito Waldemar Grubba 3300,Jaragua do Sul,SC,Fabricação de motores elétricos
-07689002000189,EMBRAER S.A.,EMBRAER,12227901,Avenida Brigadeiro Faria Lima 2170,Sao Jose dos Campos,SP,Fabricação de aeronaves
-16670085000155,LOCALIZA RENT A CAR S.A.,LOCALIZA,30380000,Avenida Bernardo de Vasconcelos 377,Belo Horizonte,MG,Locação de automóveis
-71673990000177,NATURA COSMETICOS S.A.,NATURA,06454000,Rodovia Anhanguera,Cajamar,SP,Fabricação de cosméticos
+cnpj,razao_social,nome_fantasia,cep,logradouro,municipio,uf,cnae,Codigo,CodVen,UltCpr,DatMaiCpr
+33000167000101,PETROLEO BRASILEIRO S.A.,PETROBRAS,20031912,Avenida Republica do Chile 65,Rio de Janeiro,RJ,Extração de petróleo e gás natural,1001,VEN_01,2025-10-15,2024-05-10
+33592510000154,VALE S.A.,VALE,20020906,Praia de Botafogo 186,Rio de Janeiro,RJ,Extração de minério de ferro,1002,VEN_01,2023-01-20,2022-11-15
+47960950000121,MAGAZINE LUIZA S.A.,MAGALU,01311300,Rua Padre Joao Manuel 600,Sao Paulo,SP,Comércio varejista,1003,VEN_02,2026-05-01,2025-12-01
+07526557000100,AMBEV S.A.,AMBEV,04578000,Rua Dr Renato Paes de Barros 1017,Sao Paulo,SP,Fabricação de cervejas,1004,VEN_02,2021-06-10,2021-06-10
+60701190000104,ITAU UNIBANCO HOLDING S.A.,ITAU UNIBANCO,04538132,Praca Alfredo Egydio de Souza Aranha 100,Sao Paulo,SP,Bancos múltiplos,1005,VEN_03,2026-01-15,2024-02-28
+09346601000125,B3 S.A. - BRASIL BOLSA BALCAO,B3,04538132,Rua Quinze de Novembro 275,Sao Paulo,SP,Administração de bolsas,1006,VEN_03,,
+84429695000111,WEG S.A.,WEG,89256900,Avenida Prefeito Waldemar Grubba 3300,Jaragua do Sul,SC,Fabricação de motores elétricos,1007,VEN_04,2025-08-20,2023-09-05
+07689002000189,EMBRAER S.A.,EMBRAER,12227901,Avenida Brigadeiro Faria Lima 2170,Sao Jose dos Campos,SP,Fabricação de aeronaves,1008,VEN_04,2020-03-15,2019-11-20
+16670085000155,LOCALIZA RENT A CAR S.A.,LOCALIZA,30380000,Avenida Bernardo de Vasconcelos 377,Belo Horizonte,MG,Locação de automóveis,1009,VEN_01,2026-04-10,2026-04-10
+71673990000177,NATURA COSMETICOS S.A.,NATURA,06454000,Rodovia Anhanguera,Cajamar,SP,Fabricação de cosméticos,1010,VEN_02,2024-11-05,2023-07-12

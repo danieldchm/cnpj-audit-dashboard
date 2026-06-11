@@ -379,64 +379,137 @@ const Utils = (function () {
   }
 
   /**
-   * Determine the priority level of an audit result.
+   * Advanced Distribuidora Scoring Engine
+   * Calculates the final score (0-100) based on multiple strategic components.
    *
-   * | Condition                              | Priority  |
-   * |----------------------------------------|-----------|
-   * | Situação cadastral !== 'ATIVA'         | ALTA      |
-   * | 3+ divergences                         | ALTA      |
-   * | 1–2 divergences                        | MEDIA     |
-   * | 0 divergences (but review recommended) | BAIXA     |
-   * | Fully clean                            | NENHUMA   |
-   *
-   * @param {Object} officialData - Official data from BrasilAPI.
-   * @param {Array} divergences - Array of divergence objects.
-   * @returns {'ALTA'|'MEDIA'|'BAIXA'|'NENHUMA'} Priority level.
+   * @param {Object} internalData 
+   * @param {Object} officialData 
+   * @param {Array} divergences 
+   * @returns {Object} Score breakdown, total score, priority, action
    */
-  function determinePriority(officialData, divergences) {
-    const situacao = (
-      officialData?.descricao_situacao_cadastral ?? ''
-    ).toUpperCase();
-
+  function calculateVpaScore(internalData, officialData, divergences) {
+    let scoreRecencia = 0;
+    let scorePorte = 0;
+    let scoreCadastral = 0;
+    let scoreDados = 0;
+    let scoreAfinidade = 0;
+    
+    // 1. Score Recência (30%)
+    let diasInativos = -1;
+    if (internalData.ultcpr) {
+      const ultCprDate = new Date(internalData.ultcpr);
+      if (!isNaN(ultCprDate.getTime())) {
+        const diffTime = Math.abs(new Date() - ultCprDate);
+        diasInativos = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diasInativos <= 180) scoreRecencia = 90; // < 6 meses
+        else if (diasInativos <= 365) scoreRecencia = 70; // 6-12 meses
+        else if (diasInativos <= 730) scoreRecencia = 50; // 1-2 anos
+        else if (diasInativos <= 1095) scoreRecencia = 30; // 2-3 anos
+        else scoreRecencia = 10; // > 3 anos
+      }
+    }
+    
+    // 2. Score Porte (15%)
+    const porteStr = (officialData?.porte || '').toUpperCase();
+    const capital = parseFloat(officialData?.capital_social) || 0;
+    if (porteStr === 'DEMAIS' || capital > 500000) scorePorte = 90;
+    else if (porteStr.includes('EPP') || (capital >= 50000 && capital <= 500000)) scorePorte = 60;
+    else if (porteStr.includes('ME') || (capital > 0 && capital < 50000)) scorePorte = 30;
+    else scorePorte = 15; // MEI or unknown
+    
+    // 3. Score Cadastral (20%)
+    const situacao = (officialData?.descricao_situacao_cadastral || '').toUpperCase();
+    const numDiv = divergences.length;
+    if (situacao === 'ATIVA') {
+      if (numDiv === 0) scoreCadastral = 100;
+      else scoreCadastral = 60;
+    } else if (situacao === 'SUSPENSA') {
+      scoreCadastral = 20;
+    } else {
+      scoreCadastral = 0; // BAIXADA
+    }
+    
+    // 4. Score Dados (15%)
+    if (officialData?.ddd_telefone_1) scoreDados += 30;
+    if (officialData?.email) scoreDados += 30;
+    if (Array.isArray(officialData?.qsa) && officialData.qsa.length > 0) scoreDados += 20;
+    if (officialData?.logradouro) scoreDados += 20;
+    
+    // 5. Score Afinidade CNAE (20%)
+    const cnae = (officialData?.cnae_fiscal_descricao || '').toUpperCase();
+    const cnaesSecundarios = Array.isArray(officialData?.cnaes_secundarios) 
+      ? officialData.cnaes_secundarios.map(c => c.descricao.toUpperCase()).join(' ') 
+      : '';
+    const allCnaes = cnae + ' ' + cnaesSecundarios;
+    
+    if (allCnaes.includes('PAPELARIA') || allCnaes.includes('LIVROS') || allCnaes.includes('LIVRARIA') || allCnaes.includes('JORNAIS')) {
+      scoreAfinidade = 100; // Core
+    } else if (allCnaes.includes('ARMARINHO')) {
+      scoreAfinidade = 70; // Alta
+    } else if (allCnaes.includes('BRINQUEDOS') || allCnaes.includes('PRESENTES') || allCnaes.includes('VAREJISTA DE PRODUTOS NOVOS')) {
+      scoreAfinidade = 50; // Média
+    } else {
+      scoreAfinidade = 20; // Outros
+    }
+    
+    // Calcula Score Final
+    const totalScore = Math.round(
+      (scoreRecencia * 0.30) +
+      (scorePorte * 0.15) +
+      (scoreCadastral * 0.20) +
+      (scoreDados * 0.15) +
+      (scoreAfinidade * 0.20)
+    );
+    
+    // Classification and Priority Map
+    let classification = '';
+    let priority = '';
+    let action = '';
+    let color = '';
+    
     if (situacao !== 'ATIVA') {
-      return 'ALTA';
+       classification = '🔴 DESCARTE / ARQUIVO';
+       priority = 'ALTA';
+       action = `BLOQUEAR CADASTRO - Empresa ${situacao}`;
+       color = 'red';
+    } else if (totalScore >= 80) {
+       classification = '🟢 OPORTUNIDADE QUENTE';
+       priority = 'ALTA';
+       action = 'Ligação direta do vendedor. Validar divergências pendentes.';
+       color = 'green';
+    } else if (totalScore >= 60) {
+       classification = '🔵 POTENCIAL ALTO';
+       priority = 'MEDIA';
+       action = 'SDR: Agendar visita + Enviar WhatsApp com catálogo Distribuidora.';
+       color = 'blue';
+    } else if (totalScore >= 40) {
+       classification = '🟡 POTENCIAL MODERADO';
+       priority = 'MEDIA';
+       action = 'Campanha de E-mail Marketing / Nutrição.';
+       color = 'yellow';
+    } else {
+       classification = '🟠 REQUER INVESTIGAÇÃO';
+       priority = 'BAIXA';
+       action = 'Investigar se perfil de cliente mudou. Baixa probabilidade de recompra imediata.';
+       color = 'orange';
     }
-
-    const count = Array.isArray(divergences) ? divergences.length : 0;
-
-    if (count >= 3) {
-      return 'ALTA';
-    }
-    if (count >= 1) {
-      return 'MEDIA';
-    }
-
-    // 0 divergences and ATIVA — fully clean
-    return 'NENHUMA';
-  }
-
-  /**
-   * Generate an actionable recommendation string based on audit results.
-   *
-   * @param {Object} officialData - Official data from BrasilAPI.
-   * @param {Array<{ campo_com_divergencia: string }>} divergences - Divergence list.
-   * @returns {string} Human-readable recommendation.
-   */
-  function determineAction(officialData, divergences) {
-    const situacao = (
-      officialData?.descricao_situacao_cadastral ?? ''
-    ).toUpperCase();
-
-    if (situacao !== 'ATIVA') {
-      return `BLOQUEAR CADASTRO - Situação: ${situacao || 'DESCONHECIDA'}. Verificar necessidade de encerramento.`;
-    }
-
-    if (Array.isArray(divergences) && divergences.length > 0) {
-      const fields = divergences.map((d) => d.campo_com_divergencia).join(', ');
-      return `Atualizar campos: ${fields}. Validar com cliente.`;
-    }
-
-    return 'Cadastro validado. Nenhuma ação necessária.';
+    
+    return {
+      totalScore,
+      priority,
+      classification,
+      action,
+      color,
+      breakdown: {
+        diasInativos,
+        scoreRecencia,
+        scorePorte,
+        scoreCadastral,
+        scoreDados,
+        scoreAfinidade
+      }
+    };
   }
 
   /**
@@ -451,8 +524,7 @@ const Utils = (function () {
    */
   function generateAuditResult(internalData, officialData) {
     const divergences = generateDivergences(internalData, officialData);
-    const priority = determinePriority(officialData, divergences);
-    const action = determineAction(officialData, divergences);
+    const vpaScoring = calculateVpaScore(internalData, officialData, divergences);
 
     const situacao = (
       officialData?.descricao_situacao_cadastral ?? ''
@@ -462,12 +534,15 @@ const Utils = (function () {
     return {
       cnpj_analisado: formatCNPJ(cleanCNPJ(internalData?.cnpj ?? '')),
       vendedor: internalData?.vendedor ?? '',
+      codigo_cliente: internalData?.codigo ?? '',
       status_receita: officialData?.descricao_situacao_cadastral ?? 'N/A',
       cadastro_valido: cadastroValido,
       divergencias: divergences,
       num_divergencias: divergences.length,
-      prioridade_geral: priority,
-      acao_recomendada: action,
+      prioridade_geral: vpaScoring.priority,
+      acao_recomendada: vpaScoring.action,
+      score_vpa: vpaScoring.totalScore,
+      score_breakdown: vpaScoring.breakdown,
       dados_completos_receita: officialData,
       inteligencia_web: null, // populated by api.js → generateWebIntelligence
       data_consulta: new Date().toISOString(),

@@ -88,6 +88,11 @@ const App = (function () {
     dom.receitaJson = $('receita-json');
     dom.toastContainer = $('toast-container');
     dom.recommendationCard = $('recommendation-card');
+    dom.commercialInsightsSection = $('commercial-insights-section');
+    dom.insightScoreVpa = $('insight-score-vpa');
+    dom.insightDiasInativos = $('insight-dias-inativos');
+    dom.insightVendedor = $('insight-vendedor');
+    dom.scoreBreakdownBars = $('score-breakdown-bars');
   }
 
   // ─── Initialization ─────────────────────────────────────────
@@ -248,7 +253,7 @@ const App = (function () {
           return {
             index: i,
             cnpj: Utils.cleanCNPJ(rawCnpj),
-            razao_social: row.razao_social || '', // 'razao' column is actually the seller name
+            razao_social: row.razao_social || '', 
             nome_fantasia: row.nome_fantasia || row.fantasia || '',
             cep: row.cep || '',
             logradouro: row.logradouro || row.endereco || '',
@@ -257,7 +262,10 @@ const App = (function () {
             cnae: row.cnae || '',
             // Extra fields from specific reference file
             vendedor: row.vendedor || row.razao || '',
-            codigo: row.codigo || ''
+            codigo: row.codigo || '',
+            codven: row.codven || '',
+            ultcpr: row.ultcpr || '',
+            datmaicpr: row.datmaicpr || ''
           };
         });
 
@@ -828,6 +836,7 @@ const App = (function () {
       dom.internalDataFields.innerHTML = renderFieldRows(getInternalFields(client));
       dom.officialDataFields.innerHTML = '<div class="empty-state-mini">Dados não disponíveis</div>';
       dom.divergencesSection.classList.add('hidden');
+      if (dom.commercialInsightsSection) dom.commercialInsightsSection.classList.add('hidden');
       dom.webIntelSummary.textContent = '—';
       dom.webIntelLink.classList.add('hidden');
       dom.webIntelStatus.innerHTML = '';
@@ -839,6 +848,46 @@ const App = (function () {
     // Recommendation
     dom.recommendationCard.classList.remove('hidden');
     dom.recText.textContent = audit.acao_recomendada || '—';
+
+    // Commercial Insights
+    if (dom.commercialInsightsSection) {
+      if (audit.score_vpa !== undefined) {
+        dom.commercialInsightsSection.classList.remove('hidden');
+        dom.insightScoreVpa.textContent = audit.score_vpa;
+        dom.insightScoreVpa.style.color = `var(--${audit.prioridade_geral === 'ALTA' ? 'red' : 'blue'}-400)`;
+        
+        const inativos = audit.score_breakdown?.diasInativos;
+        dom.insightDiasInativos.textContent = inativos >= 0 ? `${inativos} dias` : 'Sem histórico';
+        
+        const codText = audit.codigo_cliente ? ` (${audit.codigo_cliente})` : '';
+        dom.insightVendedor.textContent = (audit.vendedor_responsavel || client.vendedor || 'Sem carteira') + codText;
+
+        // Render bars
+        if (audit.score_breakdown) {
+          const barsHtml = [
+            { label: 'Recência', value: audit.score_breakdown.scoreRecencia, max: 90, color: 'cyan-500' },
+            { label: 'Afinidade', value: audit.score_breakdown.scoreAfinidade, max: 100, color: 'blue-500' },
+            { label: 'Porte', value: audit.score_breakdown.scorePorte, max: 90, color: 'indigo-400' },
+            { label: 'Cadastral', value: audit.score_breakdown.scoreCadastral, max: 100, color: 'emerald-400' },
+            { label: 'Contatos', value: audit.score_breakdown.scoreDados, max: 80, color: 'amber-400' }
+          ].map(b => {
+            const pct = Math.min(100, Math.round((b.value / b.max) * 100));
+            return `
+              <div class="score-bar-row">
+                <div class="score-bar-label">${b.label}</div>
+                <div class="score-bar-track">
+                  <div class="score-bar-fill" style="width: ${pct}%; background-color: var(--${b.color});"></div>
+                </div>
+                <div class="score-bar-value">${b.value} pts</div>
+              </div>
+            `;
+          }).join('');
+          dom.scoreBreakdownBars.innerHTML = barsHtml;
+        }
+      } else {
+        dom.commercialInsightsSection.classList.add('hidden');
+      }
+    }
 
     // Internal Data
     dom.internalDataFields.innerHTML = renderFieldRows(getInternalFields(client));
