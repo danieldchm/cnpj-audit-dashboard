@@ -1250,3 +1250,5 @@ const Utils = (function () {
     throttle,
   };
 })();
+
+if (typeof window !== 'undefined') window.Utils = Utils;
