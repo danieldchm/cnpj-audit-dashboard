@@ -2127,7 +2127,7 @@ td.razao-cell {
 
 .commercial-insights-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -2152,6 +2152,22 @@ td.razao-cell {
   font-size: 1.125rem;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.score-vendas {
+  background: rgba(34, 197, 94, 0.05);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+.score-vendas .insight-value {
+  color: var(--green-400);
+}
+
+.score-higiene {
+  background: rgba(56, 189, 248, 0.05);
+  border-color: rgba(56, 189, 248, 0.2);
+}
+.score-higiene .insight-value {
+  color: var(--cyan-400);
 }
 
 .score-breakdown {

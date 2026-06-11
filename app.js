@@ -89,9 +89,10 @@ const App = (function () {
     dom.toastContainer = $('toast-container');
     dom.recommendationCard = $('recommendation-card');
     dom.commercialInsightsSection = $('commercial-insights-section');
-    dom.insightScoreVpa = $('insight-score-vpa');
+    dom.insightScoreVendas = $('insight-score-vendas');
+    dom.insightScoreHigiene = $('insight-score-higiene');
     dom.insightDiasInativos = $('insight-dias-inativos');
-    dom.insightVendedor = $('insight-vendedor');
+    dom.insightPorte = $('insight-porte');
     dom.scoreBreakdownBars = $('score-breakdown-bars');
   }
 
@@ -851,25 +852,27 @@ const App = (function () {
 
     // Commercial Insights
     if (dom.commercialInsightsSection) {
-      if (audit.score_vpa !== undefined) {
+      if (audit.score_oportunidade !== undefined) {
         dom.commercialInsightsSection.classList.remove('hidden');
-        dom.insightScoreVpa.textContent = audit.score_vpa;
-        dom.insightScoreVpa.style.color = `var(--${audit.prioridade_geral === 'ALTA' ? 'red' : 'blue'}-400)`;
+        dom.insightScoreVendas.textContent = audit.score_oportunidade;
         
+        if (audit.score_higiene !== undefined) {
+          dom.insightScoreHigiene.textContent = audit.score_higiene;
+        }
+
         const inativos = audit.score_breakdown?.diasInativos;
         dom.insightDiasInativos.textContent = inativos >= 0 ? `${inativos} dias` : 'Sem histórico';
         
-        const codText = audit.codigo_cliente ? ` (${audit.codigo_cliente})` : '';
-        dom.insightVendedor.textContent = (audit.vendedor_responsavel || client.vendedor || 'Sem carteira') + codText;
+        dom.insightPorte.textContent = audit.score_breakdown?.porteDetectado || '—';
 
         // Render bars
         if (audit.score_breakdown) {
           const barsHtml = [
-            { label: 'Recência', value: audit.score_breakdown.scoreRecencia, max: 90, color: 'cyan-500' },
-            { label: 'Afinidade', value: audit.score_breakdown.scoreAfinidade, max: 100, color: 'blue-500' },
-            { label: 'Porte', value: audit.score_breakdown.scorePorte, max: 90, color: 'indigo-400' },
-            { label: 'Cadastral', value: audit.score_breakdown.scoreCadastral, max: 100, color: 'emerald-400' },
-            { label: 'Contatos', value: audit.score_breakdown.scoreDados, max: 80, color: 'amber-400' }
+            { label: 'Recência', value: audit.score_breakdown.scoreRecencia === 'N/D' ? 0 : audit.score_breakdown.scoreRecencia, max: 100, color: 'cyan-500' },
+            { label: 'Afinidade CNAE', value: audit.score_breakdown.scoreAfinidade, max: 100, color: 'blue-500' },
+            { label: 'Porte', value: audit.score_breakdown.scorePorte, max: 100, color: 'indigo-400' },
+            { label: 'Consistência', value: audit.score_breakdown.consistenciaCadastro, max: 40, color: 'emerald-400' },
+            { label: 'Completude', value: audit.score_breakdown.completudeCadastro, max: 60, color: 'amber-400' }
           ].map(b => {
             const pct = Math.min(100, Math.round((b.value / b.max) * 100));
             return `
@@ -878,7 +881,7 @@ const App = (function () {
                 <div class="score-bar-track">
                   <div class="score-bar-fill" style="width: ${pct}%; background-color: var(--${b.color});"></div>
                 </div>
-                <div class="score-bar-value">${b.value} pts</div>
+                <div class="score-bar-value">${b.value === 0 && b.label === 'Recência' ? 'N/D' : b.value + ' pts'}</div>
               </div>
             `;
           }).join('');
