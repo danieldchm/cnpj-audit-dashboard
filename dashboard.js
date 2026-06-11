@@ -380,3 +380,5 @@ const Dashboard = (function () {
 
   return { render, switchTab };
 })();
+
+if (typeof window !== 'undefined') window.Dashboard = Dashboard;

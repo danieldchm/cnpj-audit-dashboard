@@ -511,6 +511,7 @@ const Insights = (function () {
   };
 })();
 
+if (typeof window !== 'undefined') window.Insights = Insights;
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = Insights;
 }
