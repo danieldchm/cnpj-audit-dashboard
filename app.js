@@ -14,6 +14,16 @@ const App = (function () {
   let isProcessing = false;
   let processingStartTime = null;
 
+  // Atualiza o dashboard analítico (Visão Geral / Inteligência / Plano).
+  function renderDashboard() {
+    if (window.Dashboard) Dashboard.render(results);
+  }
+  // Versão estrangulada para uso durante o batch (evita re-render a cada CNPJ).
+  const renderDashboardThrottled =
+    (typeof Utils !== 'undefined' && Utils.throttle)
+      ? Utils.throttle(renderDashboard, 800)
+      : renderDashboard;
+
   // ─── DOM References ─────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
 
@@ -299,6 +309,7 @@ const App = (function () {
 
         applyFilters();
         updateMetrics();
+        renderDashboard();
         showToast(`${parsed.length} registros importados com sucesso!`, 'success');
 
       } catch (err) {
@@ -333,6 +344,7 @@ const App = (function () {
     dom.tableCount.textContent = '';
     closeDetailPanel();
     updateMetrics();
+    renderDashboard();
     showToast('Arquivo removido.', 'info');
   }
 
@@ -470,6 +482,8 @@ const App = (function () {
 
     const processed = results.filter(r => r.status !== 'pending').length;
     showToast(`Processamento finalizado! ${processed}/${clients.length} CNPJs auditados.`, 'success');
+
+    renderDashboard();
   }
 
   function onBatchProgress(index, total, result) {
@@ -526,6 +540,7 @@ const App = (function () {
     // Update table and metrics
     applyFilters();
     updateMetrics();
+    renderDashboardThrottled();
 
     // If detail panel is open for this row, refresh it
     if (selectedIndex === index && results[index].auditResult) {
@@ -808,6 +823,7 @@ const App = (function () {
 
     applyFilters();
     updateMetrics();
+    renderDashboard();
     dom.btnExport.disabled = false;
   }
 
@@ -1179,7 +1195,8 @@ const App = (function () {
             currentPage = 1;
             updateMetrics();
             applyFilters();
-            
+            renderDashboard();
+
             dom.btnProcess.disabled = true;
             dom.btnExport.disabled = false;
             
