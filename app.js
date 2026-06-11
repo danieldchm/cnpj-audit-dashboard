@@ -31,6 +31,13 @@ const App = (function () {
     dom.btnProcessText = $('btn-process-text');
     dom.btnCancel = $('btn-cancel');
     dom.btnExport = $('btn-export');
+    dom.exportDropdown = $('export-dropdown');
+    dom.exportMenu = $('export-menu');
+    dom.btnExportCsv = $('btn-export-csv');
+    dom.btnExportXlsx = $('btn-export-xlsx');
+    dom.btnExportJson = $('btn-export-json');
+    dom.btnImportResults = $('btn-import-results');
+    dom.importResultsInput = $('import-results-input');
     dom.btnSearchCnpj = $('btn-search-cnpj');
     dom.cnpjInputWrapper = $('cnpj-input-wrapper');
     dom.cnpjDirectInput = $('cnpj-direct-input');
@@ -132,8 +139,27 @@ const App = (function () {
     dom.detailOverlay.addEventListener('click', closeDetailPanel);
     dom.accordionHeader.addEventListener('click', toggleAccordion);
 
-    // Export
-    dom.btnExport.addEventListener('click', handleExport);
+    // Export Dropdown
+    if (dom.btnExport && dom.exportMenu) {
+      dom.btnExport.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dom.exportMenu.classList.toggle('hidden');
+      });
+      document.addEventListener('click', () => {
+        if (dom.exportMenu && !dom.exportMenu.classList.contains('hidden')) {
+          dom.exportMenu.classList.add('hidden');
+        }
+      });
+    }
+
+    // Export Actions
+    if (dom.btnExportCsv) dom.btnExportCsv.addEventListener('click', () => handleExport('csv'));
+    if (dom.btnExportXlsx) dom.btnExportXlsx.addEventListener('click', () => handleExport('xlsx'));
+    if (dom.btnExportJson) dom.btnExportJson.addEventListener('click', () => handleExport('json'));
+
+    // Import Actions
+    if (dom.btnImportResults) dom.btnImportResults.addEventListener('click', () => dom.importResultsInput.click());
+    if (dom.importResultsInput) dom.importResultsInput.addEventListener('change', handleImportResults);
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
@@ -917,11 +943,31 @@ const App = (function () {
     dom.accordionHeader.classList.toggle('open');
   }
 
-  // ─── Export ─────────────────────────────────────────────────
-  function handleExport() {
+  // ─── Export & Import ────────────────────────────────────────
+  function handleExport(format) {
+    if (dom.exportMenu) {
+      dom.exportMenu.classList.add('hidden');
+    }
+
+    if (format === 'json') {
+      // Export the full application state
+      if (clients.length === 0) {
+        showToast('Nenhum dado para exportar.', 'warning');
+        return;
+      }
+      const state = {
+        timestamp: new Date().toISOString(),
+        clients: clients,
+        results: results
+      };
+      Utils.exportToJSON(state, `auditbase_state_${state.timestamp.slice(0, 10)}.json`);
+      showToast('Estado completo exportado em JSON.', 'success');
+      return;
+    }
+
     const exportResults = [];
     for (let i = 0; i < clients.length; i++) {
-      if (results[i].auditResult) {
+      if (results[i] && results[i].auditResult) {
         exportResults.push(results[i].auditResult);
       }
     }
@@ -929,10 +975,164 @@ const App = (function () {
       showToast('Nenhum resultado processado para exportar.', 'warning');
       return;
     }
-    const csv = Utils.exportToCSV(exportResults);
+
     const timestamp = new Date().toISOString().slice(0, 10);
-    Utils.downloadCSV(csv, `auditbase_resultados_${timestamp}.csv`);
-    showToast(`${exportResults.length} resultados exportados com sucesso!`, 'success');
+    if (format === 'csv') {
+      const csv = Utils.exportToCSV(exportResults);
+      Utils.downloadCSV(csv, `auditbase_resultados_${timestamp}.csv`);
+      showToast(`${exportResults.length} resultados exportados em CSV!`, 'success');
+    } else if (format === 'xlsx') {
+      Utils.exportToXLSX(exportResults, `auditbase_resultados_${timestamp}.xlsx`);
+      showToast(`${exportResults.length} resultados exportados em Excel!`, 'success');
+    }
+  }
+
+  function handleImportResults(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const fileExt = file.name.split('.').pop().toLowerCase();
+    
+    if (fileExt === 'json') {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const state = JSON.parse(event.target.result);
+          if (state.clients && state.results) {
+            clients = state.clients;
+            results = state.results;
+            
+            // Re-render UI
+            dom.uploadArea.style.display = 'none';
+            dom.fileInfo.classList.remove('hidden');
+            dom.fileName.textContent = file.name;
+            dom.fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+            
+            currentPage = 1;
+            updateMetrics();
+            applyFilters();
+            
+            dom.btnProcess.disabled = true;
+            dom.btnExport.disabled = false;
+            
+            showToast('Análise JSON importada com sucesso!', 'success');
+          } else {
+            showToast('Arquivo JSON inválido. Formato esperado não encontrado.', 'error');
+          }
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao ler arquivo JSON.', 'error');
+        }
+      };
+      reader.readAsText(file);
+    } else if (fileExt === 'xlsx') {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const data = new Uint8Array(event.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          if (rows.length < 2) {
+            showToast('Arquivo Excel vazio ou sem dados.', 'error');
+            return;
+          }
+          
+          const headers = rows[0];
+          
+          clients = [];
+          results = [];
+          
+          for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || row.length === 0) continue;
+            
+            const getVal = (colName) => {
+              const idx = headers.indexOf(colName);
+              return idx >= 0 ? row[idx] || '' : '';
+            };
+            
+            const cnpj = getVal('CNPJ');
+            if (!cnpj) continue;
+            
+            const client = {
+              cgcCpf: cnpj,
+              razao: getVal('Interno_Razao_Social'),
+              vendedor: getVal('Vendedor_Responsavel'),
+              cidade: getVal('Interno_Município'),
+              estado: getVal('Interno_UF'),
+            };
+            
+            const statusGeral = getVal('Status_Geral');
+            let isDivergent = false;
+            if (statusGeral === 'divergence') isDivergent = true;
+            
+            const result = {
+              status: statusGeral === 'error' ? 'error' : 'success',
+              isDivergent: isDivergent,
+              auditResult: {
+                cnpj: cnpj,
+                status_geral: statusGeral,
+                status_receita: getVal('Status_Receita'),
+                prioridade: getVal('Prioridade_Contato'),
+                score: parseInt(getVal('Score_Reativacao'), 10) || 0,
+                vendedor_responsavel: getVal('Vendedor_Responsavel'),
+                recomendacao: getVal('Recomendacao'),
+                divergences: getVal('Divergencias') ? getVal('Divergencias').split(', ') : [],
+                internalData: {
+                  razao_social: getVal('Interno_Razao_Social'),
+                  nome_fantasia: getVal('Interno_Nome_Fantasia'),
+                  cep: getVal('Interno_CEP'),
+                  logradouro: getVal('Interno_Endereço'),
+                  municipio: getVal('Interno_Município'),
+                  uf: getVal('Interno_UF'),
+                  cnae: getVal('Interno_CNAE')
+                },
+                officialData: {
+                  razao_social: getVal('Receita_Razao_Social'),
+                  nome_fantasia: getVal('Receita_Nome_Fantasia'),
+                  cep: getVal('Receita_CEP'),
+                  logradouro: getVal('Receita_Endereço'),
+                  municipio: getVal('Receita_Município'),
+                  uf: getVal('Receita_UF'),
+                  cnae_fiscal_descricao: getVal('Receita_CNAE')
+                },
+                observacoes: getVal('Observacoes')
+              }
+            };
+            
+            clients.push(client);
+            results.push(result);
+          }
+          
+          dom.uploadArea.style.display = 'none';
+          dom.fileInfo.classList.remove('hidden');
+          dom.fileName.textContent = file.name;
+          dom.fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+          
+          currentPage = 1;
+          updateMetrics();
+          applyFilters();
+          
+          dom.btnProcess.disabled = true;
+          dom.btnExport.disabled = false;
+          
+          showToast(`Arquivo Excel importado com ${clients.length} registros!`, 'success');
+          
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao processar arquivo XLSX.', 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      showToast('Formato não suportado para importação.', 'error');
+    }
+    
+    // Reset file input
+    e.target.value = '';
   }
 
   // ─── Toast Notifications ────────────────────────────────────

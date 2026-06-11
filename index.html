@@ -34,10 +34,22 @@
         <span class="header-badge">Protótipo v1.0</span>
       </div>
       <div class="header-actions">
-        <button class="btn btn-export" id="btn-export" disabled title="Exportar resultados processados">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Exportar CSV
+        <div class="export-dropdown" id="export-dropdown">
+          <button class="btn btn-export" id="btn-export" disabled title="Exportar resultados processados">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar ▾
+          </button>
+          <div class="export-menu hidden" id="export-menu">
+            <button class="export-menu-item" id="btn-export-csv">📄 Exportar CSV</button>
+            <button class="export-menu-item" id="btn-export-xlsx">📊 Exportar Excel (.xlsx)</button>
+            <button class="export-menu-item" id="btn-export-json">🔧 Exportar JSON (reimportável)</button>
+          </div>
+        </div>
+        <button class="btn btn-secondary" id="btn-import-results" title="Importar análise anterior (JSON ou XLSX)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Importar Análise
         </button>
+        <input type="file" id="import-results-input" class="file-input" accept=".json,.xlsx">
       </div>
     </div>
   </header>

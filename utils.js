@@ -657,22 +657,13 @@ const Utils = (function () {
   }
 
   /**
-   * Trigger a browser download of a CSV string as a file.
+   * Generic function to trigger a browser download from a Blob.
    *
-   * Creates a temporary Blob URL, programmatically clicks a hidden anchor,
-   * then revokes the URL.
-   *
-   * @param {string} csvString - The CSV content.
-   * @param {string} [filename='auditoria_cnpj.csv'] - Download file name.
+   * @param {Blob} blob - The file content.
+   * @param {string} filename - Download file name.
    */
-  function downloadCSV(csvString, filename = 'auditoria_cnpj.csv') {
-    if (typeof csvString !== 'string' || csvString.length === 0) {
-      console.warn('downloadCSV: nothing to download.');
-      return;
-    }
-
+  function downloadBlob(blob, filename) {
     try {
-      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -683,8 +674,79 @@ const Utils = (function () {
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('downloadCSV: failed to trigger download.', err);
+      console.error('downloadBlob: failed to trigger download.', err);
     }
+  }
+
+  /**
+   * Trigger a browser download of a CSV string as a file.
+   *
+   * @param {string} csvString - The CSV content.
+   * @param {string} [filename='auditoria_cnpj.csv'] - Download file name.
+   */
+  function downloadCSV(csvString, filename = 'auditoria_cnpj.csv') {
+    if (typeof csvString !== 'string' || csvString.length === 0) {
+      console.warn('downloadCSV: nothing to download.');
+      return;
+    }
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    downloadBlob(blob, filename);
+  }
+
+  /**
+   * Export results to XLSX using SheetJS and trigger download.
+   *
+   * @param {Array<Object>} results - The audit results to export.
+   * @param {string} filename - The file name to download.
+   */
+  function exportToXLSX(results, filename = 'auditoria_cnpj.xlsx') {
+    if (!window.XLSX) {
+      console.error('SheetJS (XLSX) library is not loaded.');
+      return;
+    }
+
+    const flatData = results.map(r => ({
+      CNPJ: r.cnpj,
+      Status_Geral: r.status_geral,
+      Status_Receita: r.status_receita,
+      Prioridade_Contato: r.prioridade,
+      Score_Reativacao: r.score,
+      Vendedor_Responsavel: r.vendedor_responsavel,
+      Recomendacao: r.recomendacao,
+      Divergencias: Array.isArray(r.divergences) ? r.divergences.join(', ') : '',
+      Interno_Razao_Social: r.internalData?.razao_social || '',
+      Receita_Razao_Social: r.officialData?.razao_social || '',
+      Interno_Nome_Fantasia: r.internalData?.nome_fantasia || '',
+      Receita_Nome_Fantasia: r.officialData?.nome_fantasia || '',
+      Interno_CEP: r.internalData?.cep || '',
+      Receita_CEP: r.officialData?.cep || '',
+      Interno_Endereço: r.internalData?.logradouro || '',
+      Receita_Endereço: [r.officialData?.logradouro, r.officialData?.numero].filter(Boolean).join(', '),
+      Interno_Município: r.internalData?.municipio || '',
+      Receita_Município: r.officialData?.municipio || '',
+      Interno_UF: r.internalData?.uf || '',
+      Receita_UF: r.officialData?.uf || '',
+      Interno_CNAE: r.internalData?.cnae || '',
+      Receita_CNAE: r.officialData?.cnae_fiscal_descricao || '',
+      Observacoes: r.observacoes || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(flatData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Resultados_Auditoria");
+    XLSX.writeFile(workbook, filename);
+  }
+
+  /**
+   * Export full data state as a JSON file.
+   *
+   * @param {Object} data - The data state to export (usually { clients, results }).
+   * @param {string} filename - The file name to download.
+   */
+  function exportToJSON(data, filename = 'auditoria_state.json') {
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    downloadBlob(blob, filename);
   }
 
   /**
@@ -818,6 +880,8 @@ const Utils = (function () {
     generateAuditResult,
     exportToCSV,
     downloadCSV,
+    exportToXLSX,
+    exportToJSON,
     downloadTemplateCSV,
     formatCurrency,
     sleep,
