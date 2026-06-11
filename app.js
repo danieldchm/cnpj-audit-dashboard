@@ -78,6 +78,8 @@ const App = (function () {
     dom.recText = $('rec-text');
     dom.internalDataFields = $('internal-data-fields');
     dom.officialDataFields = $('official-data-fields');
+    dom.brasilapiExtendedData = $('brasilapi-extended-data');
+    dom.brasilapiQsaData = $('brasilapi-qsa-data');
     dom.divergencesSection = $('divergences-section');
     dom.divergencesList = $('divergences-list');
     dom.webIntelStatus = $('web-intel-status');
@@ -836,6 +838,10 @@ const App = (function () {
       dom.recText.textContent = result.error || 'Aguardando processamento...';
       dom.internalDataFields.innerHTML = renderFieldRows(getInternalFields(client));
       dom.officialDataFields.innerHTML = '<div class="empty-state-mini">Dados não disponíveis</div>';
+      if (dom.brasilapiExtendedData) {
+        dom.brasilapiExtendedData.innerHTML = '';
+        dom.brasilapiQsaData.innerHTML = '';
+      }
       dom.divergencesSection.classList.add('hidden');
       if (dom.commercialInsightsSection) dom.commercialInsightsSection.classList.add('hidden');
       dom.webIntelSummary.textContent = '—';
@@ -899,6 +905,44 @@ const App = (function () {
     const official = audit.dados_completos_receita || {};
     const divergentFields = (audit.divergencias || []).map(d => d.campo_com_divergencia);
     dom.officialDataFields.innerHTML = renderFieldRows(getOfficialFields(official), divergentFields);
+
+    // BrasilAPI Extended Data
+    if (dom.brasilapiExtendedData) {
+      const formatCurrencyLocal = (val) => {
+        const num = parseFloat(val);
+        if (isNaN(num)) return 'Não informado';
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
+      };
+
+      const formatBoolean = (val) => {
+        if (val === true) return 'Sim';
+        if (val === false) return 'Não';
+        return 'N/D';
+      };
+
+      const extendedFields = [
+        { label: 'Abertura', value: Utils.parseDateFlexible(official.data_inicio_atividade)?.toLocaleDateString('pt-BR') || official.data_inicio_atividade },
+        { label: 'Capital Social', value: formatCurrencyLocal(official.capital_social) },
+        { label: 'Natureza Jurídica', value: official.natureza_juridica },
+        { label: 'Simples Nacional', value: formatBoolean(official.opcao_pelo_simples) },
+        { label: 'MEI', value: formatBoolean(official.opcao_pelo_mei) }
+      ];
+      
+      dom.brasilapiExtendedData.innerHTML = renderFieldRows(extendedFields);
+
+      // QSA Data
+      const qsa = official.qsa;
+      if (Array.isArray(qsa) && qsa.length > 0) {
+        dom.brasilapiQsaData.innerHTML = qsa.map(s => \`
+          <div style="font-size: 0.85rem; padding: 4px 0; border-bottom: 1px dashed var(--border-subtle); display: flex; justify-content: space-between;">
+            <span>\${escapeHtml(s.nome_socio)}</span>
+            <span style="color: var(--text-muted);">\${escapeHtml(s.qualificacao_socio)}</span>
+          </div>
+        \`).join('');
+      } else {
+        dom.brasilapiQsaData.innerHTML = '<div class="text-muted text-sm">Nenhum sócio listado no QSA.</div>';
+      }
+    }
 
     // Divergences
     const divergences = audit.divergencias || [];
