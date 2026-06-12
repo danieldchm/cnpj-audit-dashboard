@@ -62,6 +62,14 @@ const API = (function () {
       };
     }
 
+    if (!Utils.validateCNPJ(digits)) {
+      return {
+        error: true,
+        message: 'CNPJ inválido: dígitos verificadores incorretos.',
+        code: 400,
+      };
+    }
+
     const url = `${BRASIL_API_BASE}/${digits}`;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -217,18 +225,19 @@ const API = (function () {
 
     // API returned an error
     if (officialData && officialData.error) {
+      const isPermanent = officialData.code === 404 || officialData.code === 400;
       return {
         cnpj_analisado: Utils.formatCNPJ(Utils.cleanCNPJ(clientData.cnpj)),
-        status_receita: 'ERRO',
+        status_receita: isPermanent ? (officialData.code === 404 ? 'NÃO ENCONTRADO' : 'INVÁLIDO') : 'ERRO',
         cadastro_valido: false,
         divergencias: [],
         num_divergencias: 0,
         prioridade_geral: 'DESCARTE',
-        acao_recomendada: `Erro na consulta: ${officialData.message}`,
+        acao_recomendada: isPermanent ? (officialData.code === 404 ? 'CNPJ não encontrado na Receita Federal.' : 'CNPJ inválido (dígitos incorretos).') : `Erro na consulta: ${officialData.message}`,
         dados_completos_receita: null,
         inteligencia_web: null,
         data_consulta: new Date().toISOString(),
-        _status: 'error',
+        _status: isPermanent ? 'inactive' : 'error',
         _errorMessage: officialData.message,
         _errorCode: officialData.code,
       };

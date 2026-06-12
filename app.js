@@ -278,7 +278,7 @@ const App = (function () {
             uf: row.uf || row.estado || '',
             cnae: row.cnae || '',
             // Extra fields from specific reference file
-            vendedor: row.vendedor || row.razao || '',
+            vendedor: row.vendedor || row.codven || 'Sem Vendedor',
             codigo: row.codigo || '',
             codven: row.codven || '',
             ultcpr: row.ultcpr || '',
@@ -417,7 +417,12 @@ const App = (function () {
         results[0] = { status: 'error', priority: null, auditResult: null, error: result._errorMessage || result.acao_recomendada };
         showToast(`Erro: ${result._errorMessage || 'Falha na consulta'}`, 'error');
       } else {
-        const status = result.divergencias && result.divergencias.length > 0 ? 'divergence' : 'success';
+        const hasDivergence = result.divergencias && result.divergencias.length > 0;
+        const isInactive = result.status_receita !== 'ATIVA' && result.status_receita !== 'ERRO';
+        let status = 'success';
+        if (isInactive) status = 'inactive';
+        else if (hasDivergence) status = 'divergence';
+
         result.vendedor = clients[0]?.vendedor || '';
         results[0] = { status, priority: result.prioridade_geral, auditResult: result, error: null };
         // Update internal data from official if empty

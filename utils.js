@@ -87,12 +87,17 @@ const Utils = (function () {
       '4761003': 100, // varejo de artigos de papelaria (core absoluto)
       '4761001': 90,  // varejo de livros
       '4761002': 80,  // varejo de jornais e revistas
+      '47610': 90,    // varejo de livros/jornais genérico
       '4647801': 90,  // atacado de artigos de escritório e papelaria
       '4647802': 80,  // atacado de livros, jornais e publicações
+      '46478': 85,    // atacado de papelaria genérico
       '4789007': 75,  // varejo de equipamentos para escritório
-      '4755503': 70,  // armarinho
-      '47636': 55,    // brinquedos e artigos recreativos
+      '4789099': 60,  // outros comércios novos
       '4789001': 50,  // souvenirs e presentes
+      '47890': 50,    // equipamentos e presentes
+      '4755503': 70,  // armarinho específico
+      '47555': 70,    // armarinho
+      '47636': 55,    // brinquedos e artigos recreativos
       '47130': 50,    // lojas de departamentos / variedades
       '85': 65,       // educação (escolas compram material recorrentemente)
       '18': 60,       // impressão e reprodução (gráficas compram papel)
