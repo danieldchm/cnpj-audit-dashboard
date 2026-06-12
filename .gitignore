@@ -30,3 +30,9 @@ build/
 # Temporary files
 tmp/
 temp/
+
+# FUSE filesystem temp artifacts (deleted-but-open files)
+.fuse_hidden*
+
+# Local machine-specific Claude Code settings
+.claude/settings.local.json
