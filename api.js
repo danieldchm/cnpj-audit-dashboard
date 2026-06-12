@@ -167,8 +167,8 @@ const API = (function () {
     const temTelefone = !!officialData.ddd_telefone_1;
     const temEmail = !!officialData.email;
 
-    // Sinal baseado em dados reais da Receita Federal — não inferimos URLs
-    const indiciosAtivo = isAtiva && capital > 0;
+    // Sinal baseado em dados reais da Receita Federal — se a empresa está ATIVA, ela está operacionalmente ativa
+    const indiciosAtivo = isAtiva;
 
     const partes = [
       officialData.cnae_fiscal_descricao ? `Segmento: ${officialData.cnae_fiscal_descricao}` : null,
