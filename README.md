@@ -134,9 +134,9 @@ Strategy, Governance & Scale
 
 ## 👥 Equipe
 
-- Daniel Roecker —
+- Daniel Roecker — RM375285
 - Daniel Carrança (danieldchm) — RM370526
 - Henrique 'Padawan' Gomes Pedroso (pedrosohgp) — RM374303
-- Thiago Bezerra
-- Fabio Correa
-- Vini da JOYn
+- Thiago Bezerra — RM370486
+- Fabio Correa — RM374274
+- Vinicius Costa (Vini da JOYn) — RM375648
