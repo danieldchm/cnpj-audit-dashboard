@@ -139,4 +139,4 @@ Strategy, Governance & Scale
 - Henrique 'Padawan' Gomes Pedroso (pedrosohgp) — RM374303
 - Thiago Bezerra — RM370486
 - Fabio Correa — RM374274
-- Vinicius Costa (Vini da JOYn) — RM375648
+- Vinicius Costa — RM375648
