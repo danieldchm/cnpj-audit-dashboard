@@ -49,6 +49,24 @@ Combinando os campos do BrasilAPI entre todos os registros, o motor extrai intel
 - **Capital em risco × receita potencial** → soma do capital social ponderada por situação e prioridade.
 - **Sinais acionáveis** → oportunidades dormentes (empresa boa parada há muito tempo), recém-reativadas na RFB, bom score sem canal de contato, e capital alto preso em empresa inativa.
 
+## 🗺️ Roadmap: Evolução em Direção a CRM
+
+Embora o **AuditBase** não tenha o objetivo de se tornar um CRM completo de mercado (como Hubspot ou Salesforce), a ferramenta pode evoluir para estabelecer a **fundação e os canais de dados necessários** para uma futura implementação corporativa de maior escala. Abaixo está o planejamento de evolução em direção a este objetivo:
+
+### 📍 Fase 1: Persistência Local & Histórico de Interação (Fundação de Dados)
+*   **Banco de Dados Local (`IndexedDB`)**: Salvamento automático do progresso de auditoria no navegador. O usuário não precisará reimportar planilhas para continuar o trabalho.
+*   **Registros de Contato (Logs)**: Funcionalidade para registrar logs de interações (ex: "Tentativa de contato via WhatsApp", "Ligação não atendida", "Em negociação") diretamente na ficha do cliente.
+*   **Campos de Anotações**: Campo de texto livre para o vendedor registrar notas sobre o feedback do cliente, objeções ou propostas acordadas.
+
+### 📍 Fase 2: Funil de Reativação & Gestão de Agenda (Operação de Vendas)
+*   **Pipeline Visual (Kanban)**: Visualização dos clientes em colunas conforme seu estágio de reativação (ex: *Fila de Espera*, *Contato Iniciado*, *Cotação Enviada*, *Reativado* ou *Descartado*).
+*   **Lembretes de Retorno (Follow-up)**: Sistema de alerta local que avisa o vendedor quando é hora de fazer o segundo contato com um cliente específico.
+*   **Filtros Avançados de Fila**: Filtros rápidos por "Último Contato" e "Data de Follow-up" no painel operacional.
+
+### 📍 Fase 3: Integração e Sincronização (Conectividade ERP)
+*   **Webhooks de Atualização**: Botão "Sincronizar com ERP" para enviar os dados corrigidos cadastrais e o status de reativação diretamente para o sistema de retaguarda (ERP) da VPA Atacadista via API.
+*   **Importação Dinâmica por API**: Conexão com o ERP para buscar clientes inativos automaticamente de forma diária, dispensando a necessidade de exportar e importar arquivos de planilha manualmente.
+
 ## 🛠️ Tecnologias
 
 - **HTML5 / CSS3 / JavaScript** (Vanilla — zero frameworks)
