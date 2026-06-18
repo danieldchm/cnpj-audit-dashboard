@@ -161,8 +161,8 @@ const API = (function () {
       };
     }
 
-    const situacao = (officialData.descricao_situacao_cadastral ?? '').toUpperCase();
-    const isAtiva = situacao === 'ATIVA';
+    const situacao = String(officialData.descricao_situacao_cadastral || '').trim().toUpperCase();
+    const isAtiva = situacao === 'ATIVA' || officialData.situacao_cadastral === 2;
     const capital = parseFloat(officialData.capital_social) || 0;
     const temTelefone = !!officialData.ddd_telefone_1;
     const temEmail = !!officialData.email;
