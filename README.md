@@ -129,7 +129,8 @@ node run_local.js
 
 ## 📄 Licença
 
-Projeto acadêmico — Pós-graduação FIAP.
+Projecto Academico - MBA 3ABL - AI LEADERSHIP
+Strategy, Governance & Scale
 
 ## 👥 Equipe
 
