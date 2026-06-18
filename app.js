@@ -468,7 +468,7 @@ const App = (function () {
 
     showToast('Processamento iniciado! Consultando BrasilAPI...', 'info');
 
-    await API.processBatch(clients, onBatchProgress, { delayMs: 0 });
+    await API.processBatch(clients, onBatchProgress, { delayMs: 300, concurrency: 3 });
 
     // Processing finished
     isProcessing = false;

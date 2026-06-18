@@ -113,7 +113,8 @@ const API = (function () {
         return data;
       } catch (err) {
         if (attempt < MAX_RETRIES) {
-          const delay = BASE_BACKOFF_MS * Math.pow(2, attempt - 1);
+          const isFailedToFetch = err.message && err.message.toLowerCase().includes('fetch');
+          const delay = isFailedToFetch ? RATE_LIMIT_WAIT_MS : BASE_BACKOFF_MS * Math.pow(2, attempt - 1);
           console.warn(
             `fetchCNPJData: network error "${err.message}". Retrying in ${delay} ms (attempt ${attempt}/${MAX_RETRIES})…`
           );
