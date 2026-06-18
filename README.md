@@ -104,10 +104,9 @@ Projeto acadêmico — Pós-graduação FIAP.
 
 ## 👥 Equipe
 
-- Daniel Costa (danieldchm) — RM370526
-- Daniel Roecker — Definição do Problema
-- Daniel Carrança — Brief & Estratégia
-- Henrique 'Padawan' Gomes Pedroso (Pedrosohgp) — RM374303
+- Daniel Roecker —
+- Daniel Carrança (danieldchm) — RM370526
+- Henrique 'Padawan' Gomes Pedroso (pedrosohgp) — RM374303
 - Thiago Bezerra
 - Fabio Correa
 - Vini da JOYn
