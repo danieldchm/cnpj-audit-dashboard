@@ -9,14 +9,14 @@ Este documento narra o storytelling de todo o ciclo de vida do desenvolvimento d
 A jornada de desenvolvimento do **AuditBase** ilustra uma evolução clássica de *Vibe Coding*: partindo de um protótipo ágil client-side focado em utilidade rápida, a plataforma expandiu-se organicamente para resolver desafios de performance e confiabilidade com grandes bases de dados, amadurecendo sua modelagem de dados e integrando-se com ecossistemas modernos de Inteligência Artificial.
 
 A evolução é estruturada em 8 etapas consecutivas:
-1. **Concepção do MVP (Etapa 1)**: Validação local matemática de CNPJ e consumo básico da API pública da Receita via BrasilAPI.
-2. **Processamento em Massa (Etapa 2)**: Introdução de filas e workers concorrentes para contornar gargalos e otimizar tempo.
-3. **Refinamento Analítico (Etapa 3)**: Expansão da interface em abas dinâmicas e adoção de gráficos estruturados em Chart.js.
-4. **Regras de Negócio e Testes (Etapa 4)**: Saneamento lógico de scores, mapeamento de carteiras de vendedores e criação de testes de assertividade local.
-5. **Integração IA & Academia (Etapa 5)**: Lançamento de servidor nativo MCP (Model Context Protocol) e consolidação da tese acadêmica do MBA.
-6. **Escalabilidade Corporativa (Etapa 6)**: Migração para o IndexedDB client-side para gerenciar bases massivas (5.000+ CNPJs) e resiliência a falhas de conexão.
-7. **Segurança e Proteção ao Futuro (Etapa 7)**: Mitigação de vulnerabilidades (XSS), polimento estético de UI e compatibilidade com novos CNPJs Alfanuméricos (Julho/2026).
-8. **Interface de Alta Fidelidade (Etapa 8)**: Isolamento do assistente MCP em aba dedicada, design hacker (Stitch), logs em tempo real e splitters de redimensionamento interativos.
+1. **Concepção do MVP**: Validação local matemática de CNPJ e consumo básico da API pública da Receita via BrasilAPI.
+2. **Processamento em Massa**: Introdução de filas e workers concorrentes para contornar gargalos e otimizar tempo.
+3. **Refinamento Analítico**: Expansão da interface em abas dinâmicas e adoção de gráficos estruturados em Chart.js.
+4. **Regras de Negócio e Testes**: Saneamento lógico de scores, mapeamento de carteiras de vendedores e criação de testes de assertividade local.
+5. **Integração IA & Academia**: Lançamento de servidor nativo MCP (Model Context Protocol) e consolidação da tese acadêmica do MBA.
+6. **Escalabilidade Corporativa**: Migração para o IndexedDB client-side para gerenciar bases massivas (5.000+ CNPJs) e resiliência a falhas de conexão.
+7. **Segurança e Proteção ao Futuro**: Mitigação de vulnerabilidades (XSS), polimento estético de UI e compatibilidade com novos CNPJs Alfanuméricos (Julho/2026).
+8. **Interface de Alta Fidelidade**: Isolamento do assistente MCP em aba dedicada, design UI (Stitch), logs em tempo real e splitters de redimensionamento interativos.
 
 ---
 
