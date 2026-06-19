@@ -1605,6 +1605,7 @@ const App = (function () {
           vendedores.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
           
         applyFilters();
+        renderDashboard();
         showToast('Sessão anterior recuperada do navegador!', 'success');
       }
     } catch (e) {
