@@ -1,69 +1,138 @@
-# Relatório de Desenvolvimento: O Processo de *Vibe Coding* no AuditBase
+# Relatório de Desenvolvimento: A Jornada do AuditBase (Timeline de Commits)
 
-Este relatório documenta a evolução da plataforma **AuditBase** desde a ideação até sua fase atual. O foco desta análise é demonstrar como a metodologia de **Vibe Coding** — desenvolvimento ágil orientado por linguagem natural, prototipagem rápida em tempo real e orquestração via Inteligência Artificial — foi utilizada para construir uma solução complexa, e como os equilíbrios entre velocidade, qualidade e segurança foram gerenciados.
-
----
-
-## 1. O que é o *Vibe Coding* no contexto do AuditBase?
-
-*Vibe Coding* é o paradigma onde o desenvolvedor (humano) atua como **Diretor de Produto/Arquiteto**, delegando a escrita, refatoração e estruturação do código para modelos de Inteligência Artificial. No AuditBase, isso se traduziu em desenvolver um dashboard completo sem a fricção tradicional de configurar webpacks, criar dezenas de tickets no Jira ou debater stacks tecnológicas complexas. O foco era o "vibe" da aplicação: o valor entregue, a interface fluida (Glassmorphism, Dark Theme) e a velocidade do fluxo de auditoria de CNPJs.
+Este documento narra o storytelling de todo o ciclo de vida do desenvolvimento da plataforma **AuditBase**. Diferente de um relato sumarizado, este relatório segue **estritamente a ordem cronológica dos commits no Git**, utilizando as próprias mensagens de commit para demonstrar as múltiplas iterações, os desafios e as decisões técnicas de negócio tomadas via *Vibe Coding*.
 
 ---
 
-## 2. Etapas da Ideação à Maturidade (O Fluxo do Vibe Coding)
+### Fase 1: Gênese e MVP Inicial (Prototipagem)
 
-### Etapa 1: Gênese e Prototipagem Direta (Zero-Friction)
-- **Ação:** Em vez de configurar um framework complexo (React/Next.js), o projeto nasceu em **Vanilla JS, HTML e CSS puro**.
-- **Resultado:** Em minutos, a integração primária com a BrasilAPI foi estabelecida. A barreira de entrada foi reduzida a zero, permitindo visualizar os dados brutos da Receita Federal na tela de imediato. O "vibe" inicial focou em provar o conceito.
+A fundação do projeto começou com foco em funcionalidade bruta, buscando viabilizar a ideia rapidamente.
 
-### Etapa 2: Iteração Visual e Funcional por Diálogo
-- **Ação:** Melhorias de interface (painéis laterais, badges dinâmicos, layout responsivo) foram construídas pedindo ajustes de layout à IA.
-- **Resultado:** A interface escalou rapidamente. Foram adicionados o processamento em lote (Batch), análise de divergências e exportação de CSV, tudo iterado de forma contínua, testando o código na hora diretamente no navegador.
+- **`59ec12e - feat: protótipo inicial — Dashboard de Auditoria Cadastral CNPJ (AuditBase)`**  
+  A semente do projeto. O foco principal foi testar o consumo da BrasilAPI diretamente pelo navegador em Vanilla JS, provando que era possível criar uma ferramenta sem dependências pesadas de *build*.
 
-### Etapa 3: Refatoração Orientada a Negócios (Engine V2)
-- **Ação:** Uma vez que o produto visual estava pronto, o vibe coding mudou o foco para a **qualidade analítica**. Revisamos as regras de negócio em conjunto com a IA.
-- **Resultado:** Criou-se a separação entre *Score de Vendas* e *Score de Higiene*, decaimento exponencial de recência (abandonando regras rígidas de 365 dias) e o Motor de Afinidade de CNAE (`insights.js`). O código acompanhou a evolução da estratégia do negócio, não o contrário.
+- **`d2d9199 - feat: adicionar exportação para XLSX/JSON e importação de estado`**  
+  Logo após renderizar a tela, surgiu a necessidade de utilidade comercial: os dados auditados precisavam ser exportáveis (planilhas) e o estado precisava ser importado novamente para continuar o trabalho.
 
-### Etapa 4: Engenharia de Confiabilidade Ad-Hoc (Qualidade e Segurança)
-- **Ação:** O Vibe Coding costuma negligenciar testes. Para garantir a segurança sem perder agilidade, introduzimos a validação matemática local de CNPJs (evitando chamadas de API desnecessárias) e criamos um ambiente simplificado de testes (`run_local.js`) rodando sobre a máquina virtual (`vm`) do Node.js.
-- **Resultado:** Atingimos 20 asserções críticas passando com sucesso. Garantimos que CNPJs inativos fossem corretamente separados de falhas técnicas da API (Diferenciando HTTP 404 e 400 do HTTP 429).
+- **`766e5b0 - feat: implementar insights comerciais e motor de scoring avançado (Recência, CNAE, Porte)`**  
+  O pulo do gato analítico. Em vez de apenas exibir "Ativo/Inativo", criamos as primeiras regras de negócio de pontuação.
 
-### Etapa 5: Expansão via Model Context Protocol (MCP)
-- **Ação:** Para que a ferramenta não fosse um silo, encapsulamos a lógica bruta de `api.js` e `utils.js` em um Servidor MCP.
-- **Resultado:** O AuditBase deixou de ser apenas um Dashboard Web e passou a ser uma "Skill" acionável por outros agentes IA (como o Claude Desktop), provando a escalabilidade da arquitetura criada.
+- **`215857a - feat: importar analise e refatoracao do Claude v1.2`**  
+  Primeira grande refatoração utilizando Inteligência Artificial de forma direta para estruturar melhor o código em expansão.
+
+- **`7b3e1f2 - feat: cache busting e painel estendido BrasilAPI`**  
+  Melhorias de controle de cache (para garantir que novas versões chegassem ao navegador instantaneamente) e expansão dos dados consumidos da API.
 
 ---
 
-## 3. Análise de Riscos e Engenharia de Confiabilidade
+### Fase 2: Robustez de Processamento e Dados Estendidos
 
-O Vibe Coding troca burocracia por velocidade. No entanto, algumas decisões técnicas precisam ser continuamente revisadas para garantir a confiabilidade na escala corporativa.
+O aplicativo começou a ganhar corpo para suportar operações em massa e mais contexto comercial.
 
-### ✅ Riscos Resolvidos (Engenharia de Confiabilidade)
+- **`9e983e0 - fix: resolver erro de sintaxe e adicionar processamento em lote concorrente`**  
+  O desafio de processar múltiplos CNPJs exigiu a criação de um Batch (lote) com concorrência inicial, superando as consultas manuais de um em um.
 
-#### A. Estado Volátil e Ausência de Persistência (IndexedDB)
-- **Como foi resolvido:** Implementação de persistência local robusta utilizando `IndexedDB`. O estado de processamento dos CNPJs (incluindo progresso, scores calculados, divergências e inferências de inteligência) é salvo automaticamente no navegador a cada atualização do lote.
-- **Resultado:** Ao recarregar a sessão ou fechar acidentalmente a página, o aplicativo restaura automaticamente todo o lote de processamento, incluindo os gráficos analíticos, o painel de inteligência e o plano de ação de onde parou. A solução contorna com sucesso o limite estrito de 5MB do `localStorage`, suportando bases com mais de 10MB (10.000+ CNPJs) sem qualquer degradação de performance.
+- **`0373953 - feat: adicionar contatos e CNAEs da BrasilAPI, recencia e filtro por vendedor`**  
+  Adicionando filtros de vendedor, transformando a ferramenta em uma plataforma de apoio a vendas (mini-CRM).
 
----
-
-### ⚠️ Riscos Residuais e Oportunidades de Melhoria
-
-#### ⚠️ B. Limites de Rede (Rate Limiting) e Exposição de IP
-- **Risco Assumido:** Como as chamadas para a BrasilAPI são feitas do frontend, é o IP do navegador do usuário que sofre o Rate Limiting. Se a equipe de vendas tentar rodar a ferramenta na mesma rede (mesmo IP de roteador corporativo), eles podem ser bloqueados em massa pela Receita Federal/BrasilAPI.
-- **Oportunidade:** Criar uma camada de proxy leve (BFF - Backend for Frontend) em Node.js ou Cloudflare Workers para fazer cache das consultas e distribuir IPs, diminuindo o risco de bloqueios. (Mitigado no MVP com o pool de 3 workers concorrentes com delay de 300ms).
-
-#### ⚠️ C. Complexidade Crescente de Estado (Spaghetti DOM)
-- **Risco Assumido:** O aplicativo cresceu para quase 5.000 linhas de JavaScript Puro. A manipulação manual do DOM (ex: `document.getElementById`) se torna frágil e propensa a bugs visuais caso um elemento mude de nome.
-- **Oportunidade:** Utilizar a IA para portar os componentes críticos da interface para uma biblioteca baseada em estado reativo (React ou Vue), sem perder a lógica de negócios que agora já está muito bem testada no backend (graças à separação no MCP).
-
-#### ⚠️ D. Test Coverage Mínimo para *Edge Cases* Sujos
-- **Risco Assumido:** Introduzimos o `run_local.js`, mas o Vibe Coding pulou o rigor de TDD (Test-Driven Development) nas fases iniciais. O primeiro parser de datas zerava silenciosamente os scores por causa do formato US vs BR.
-- **Oportunidade:** Ampliar a suíte do `run_local.js` pedindo para a IA gerar *fuzzing* (dados caóticos aleatórios) para testar limites matemáticos (ex: CNPJs do Excel em notação científica, colunas faltando).
+- **`5a6099c - feat: adicionar situacao cadastral clara na tabela principal e no painel de detalhes`**  
+  Melhoria de UI/UX focada em tornar óbvio o status da empresa à primeira vista.
 
 ---
 
-## Conclusão para Liderança (MBA)
+### Fase 3: A Virada Analítica e Modularização (Dashboard v2)
 
-O projeto AuditBase é um caso de sucesso de **AI Leadership & Scale**. Ele prova que o "Vibe Coding" permite que líderes de negócio atuem como **Desenvolvedores 10x**, abstraindo a sintaxe para focar inteiramente na regra de negócios (Scoring Comercial) e no valor final para o usuário.
+Com o volume de informações crescendo, a interface de página única se tornou insuficiente.
 
-Ao compreender e mapear os riscos (Volatilidade, Escala de UI, APIs Client-Side), a governança foi retomada. O próximo estágio do seu processo não é frear o *Vibe Coding*, mas direcionar a Inteligência Artificial para atuar focada na mitigação dessas oportunidades em sprints futuros.
+- **`6d8b7cf - feat(insights): motor de inferencias agregadas da base`**  
+  Criação da lógica de leitura agregada de todo o lote processado.
+
+- **`b37bdc9 - feat(ui): camada de dashboard analitico com abas e graficos`** e **`210ac2a - feat(ui): reestruturar index em abas e carregar Chart.js + modulos`**  
+  O Vibe Coding quebrou a estrutura monolítica em abas (Visão Geral, Inteligência, Plano de Ação) e injetou o Chart.js para visualização de dados rica e corporativa.
+
+- **`1d95809 - feat(app): integrar render do dashboard ao fluxo`**  
+  O motor de renderização do dashboard foi atrelado ao ciclo de vida da aplicação.
+
+- **`79b17fd - docs: documentar UI/UX v2, abas e inferencias comerciais`**  
+  Parada estratégica para alinhar o conhecimento do repositório à nova arquitetura de UI.
+
+---
+
+### Fase 4: Saneamento, Testes Locais e Correções de Negócio
+
+Problemas de lógica, bugs de UI e escopo de testes exigiram rigor para manter a plataforma confiável.
+
+- **`4c99e1b - fix: expor modulos em window (Utils/Insights/Dashboard)`** e **`1e1d1ce - fix: corrigir painel de detalhe e injeção de vendedor no auditResult`**  
+  Ajustes finos no escopo do JavaScript do navegador para interatividade correta e exibição fidedigna do nome do executivo.
+
+- **`cae9e4e - fix(logic): corrigir mapeamento de vendedor, status de inativos e adicionar validacao local`** e **`1056d24 - fix(api): corrigir lógica de indício de operação ativa para empresas com situação ativa`**  
+  Desafios críticos de domínio de negócio foram resolvidos: empresas baixadas precisavam ter scores matematicamente zerados.
+
+- **`6819724 - test: adicionar script de testes locais run_local.js`**  
+  O grande salto de qualidade. Como o *Vibe Coding* muitas vezes pula testes rigorosos, criamos uma suíte com 20 asserções locais no Node.js (`vm`) para validar os cálculos sem depender de infraestruturas pesadas.
+
+---
+
+### Fase 5: Padronização Acadêmica e Integração de LLM (MCP)
+
+Preparação do projeto para a banca avaliadora do MBA e inovações arquiteturais.
+
+- **`a8848ea`, `7125709`, `0100e37`, `f681647` - (chores/docs updates)**  
+  Ajustes de repositório, configuração do `launch.json`, atualização da equipe e roadmap.
+
+- **`7ade502 - feat(mcp): adicionar servidor MCP e resolver bug de Perfil Operacional`**  
+  O AuditBase deixou de ser apenas web e se tornou uma habilidade (Skill) contextual acessível nativamente pelo Claude Desktop (IA), demonstrando expansibilidade extrema.
+
+- **`f26527f`, `92e9eaa`, `9d1b398`, `a518a1f`, `ba6d2c4`, `141fd2d`, `33df188`, `915c8ac`, `df9e73a`, `5499226`, `265345b` - (docs/apresentações)**  
+  Inclusão formal de todas as teses acadêmicas, arquivos de design de 7 passos, versões de negócio e relatórios da jornada.
+
+---
+
+### Fase 6: Resiliência em Larga Escala e Persistência de Dados (5.000+ CNPJs)
+
+Testes de estresse com lotes imensos revelaram fragilidades da rede e do navegador. A aplicação evoluiu para suportar o rigor corporativo.
+
+- **`0953b85`, `8620e2d`, `22ea71f` - (Lidando com limites da BrasilAPI)**  
+  Após enfrentar o *Rate Limiting* por requisições concorrentes, foi incluído controle rigoroso de fila com delay e gerados relatórios e amostras para 5.000 clientes anonimizados.
+
+- **`8c666a8 - feat: adicionar botao 'Reexecutar Erros' e suporte para retry seletivo de CNPJs com falha no lote`**  
+  Uma funcionalidade de *UX de Tolerância a Falhas*, para reprocessar apenas o que caiu, em vez de recomeçar do zero.
+
+- **`be0f2ec - feat: adicionar persistencia de sessao no localStorage do navegador para reter estado apos refresh`**  
+  A primeira iteração para evitar perda acidental de dados ao recarregar a tela (F5). Limitada a 5MB.
+
+- **`257d415 - feat: migrar persistencia de sessao para IndexedDB para suportar grandes bases de dados (5.000+ CNPJs)`**  
+  O ápice da confiabilidade client-side. Migramos o banco temporário para o robusto `IndexedDB`, suportando bases gigabytes.
+
+- **`97eef36 - feat: exportacao XLSX multifolhas (4 abas) com todas as inferencias...`** e **`05eb9c9`**  
+  Exportação evoluiu para gerar uma planilha rica, categorizada e com parser robusto das datas.
+
+- **`611346f - fix: resolver race condition que mantinha CNPJs travados em status 'Processando' no lote concorrente`**  
+  Eliminação de um bug fantasma que deixava a UI travada.
+
+---
+
+### Fase 7: Polimento Visual, UX, Segurança (Quick Wins) e Future-Proofing
+
+Os últimos commits da jornada focam em limpar arestas, refinar performance e adaptar-se ao futuro do Governo Federal.
+
+- **`4cd966f`, `df4f107`, `369e6ad`, `076f461`, `4f5188d` - (Layout, Sessão e Organização)**  
+  Alinhamento de paginação, forçar limpeza de cache do CSS, garantir o re-render dos gráficos quando o *IndexedDB* devolvia a sessão, e reorganização completa das pastas do repositório (`docs`, `dados`).
+
+- **`add8a3f`, `a23e45d - fix: aplicar quick wins da revisão de código (perf, XSS, a11y, SRI)`**  
+  Saneamento com foco em segurança (escapar inputs para evitar XSS) e atributos nativos de acessibilidade.
+
+- **`1273f8e`, `6d5f3c9` - (Estabilidade dos Gráficos e Tabelas)**  
+  Ajuste nos modais e overflow de tabelas do plano de ação e inteligência de base.
+
+- **`e1727a1 - fix: Retomar reprocessa so pendentes/erros + recupera zeros do CNPJ no import`**  
+  Melhoria crucial para lidar com as falhas do Excel que limpa zeros à esquerda do CNPJ, além de não reprocessar acidentalmente clientes que já deram sucesso.
+
+- **`6d566da - feat: suporte a CNPJ alfanumerico (jul/2026) + ampliar suite de testes`**  
+  O coroamento da plataforma: as validações locais no `run_local.js` e em `utils.js` foram evoluídas para processar as letras dos Novos CNPJs Alfanuméricos do Governo (transição de Julho/2026), deixando o AuditBase 100% à prova do futuro.
+
+---
+
+### Conclusão
+
+A trilha dos *commits* evidencia como o Vibe Coding orientou uma evolução metódica: do protótipo visual à abstração matemática, do monólito às abas modulares, do `localStorage` frágil ao `IndexedDB` resiliente, culminando em uma ferramenta nativa, integrada via IA, segura e preparada para o Brasil de 2026.
