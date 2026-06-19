@@ -63,15 +63,20 @@ window.Chat = (function() {
     
     // Initialize panel resizers
     initResizers();
+    
+    // Initialize pipeline tree toggle handlers
+    initPipelineTree();
   }
   
   function initResizers() {
     const sidebarResizer = document.getElementById('sidebar-resizer');
     const chatSidebar = document.getElementById('chat-sidebar');
+    const leftSidebarResizer = document.getElementById('left-sidebar-resizer');
+    const leftSidebar = document.getElementById('left-sidebar');
     const footerResizer = document.getElementById('footer-resizer');
     const logsFooter = document.getElementById('logs-footer');
     
-    // Sidebar Resizer (Horizontal drag to resize width)
+    // Right Sidebar Resizer (Horizontal drag to resize width)
     if (sidebarResizer && chatSidebar) {
       sidebarResizer.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -88,6 +93,32 @@ window.Chat = (function() {
         function onMouseUp() {
           document.body.style.cursor = 'default';
           sidebarResizer.classList.remove('bg-primary/80');
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        }
+        
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+    }
+    
+    // Left Sidebar Resizer (Horizontal drag to resize width)
+    if (leftSidebarResizer && leftSidebar) {
+      leftSidebarResizer.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        document.body.style.cursor = 'col-resize';
+        leftSidebarResizer.classList.add('bg-primary/80');
+        
+        function onMouseMove(moveEvent) {
+          const newWidth = moveEvent.clientX;
+          if (newWidth >= 200 && newWidth <= 500) {
+            leftSidebar.style.width = newWidth + 'px';
+          }
+        }
+        
+        function onMouseUp() {
+          document.body.style.cursor = 'default';
+          leftSidebarResizer.classList.remove('bg-primary/80');
           window.removeEventListener('mousemove', onMouseMove);
           window.removeEventListener('mouseup', onMouseUp);
         }
@@ -252,6 +283,9 @@ window.Chat = (function() {
     if (terminalBody) {
       terminalBody.scrollTop = terminalBody.scrollHeight;
     }
+    
+    // Highlight pipeline tree node
+    highlightPipelineTree(module, operation, status);
   }
   
   async function sendMessage() {
@@ -326,6 +360,9 @@ window.Chat = (function() {
         
         appendMessage('assistant', data.content);
         chatHistory = data.history;
+        
+        // Log final presentation completion
+        appendProtocolLog('SYSTEM', 'Resposta renderizada no histórico', 'SUCCESS');
       }
       
     } catch (err) {
@@ -619,8 +656,122 @@ window.Chat = (function() {
     
     // Reset CPU load
     setCpuLoad(1.2);
+    
+    // Reset Pipeline Tree highlights
+    resetPipelineTree();
   }
-  
+
+  function resetPipelineTree() {
+    const nodes = document.querySelectorAll('.tree-node');
+    nodes.forEach(node => {
+      const header = node.querySelector('.flex.items-center');
+      if (header) {
+        header.classList.remove('bg-primary/20', 'text-primary');
+        header.classList.add('text-on-surface-variant');
+      }
+      const children = node.querySelector('.pl-md');
+      if (children) {
+        children.classList.add('hidden');
+      }
+      const chevron = node.querySelector('.material-symbols-outlined');
+      if (chevron && chevron.textContent === 'expand_more') {
+        chevron.textContent = 'chevron_right';
+      }
+    });
+
+    const subnodes = document.querySelectorAll('#left-sidebar .pl-md > div');
+    subnodes.forEach(subnode => {
+      subnode.classList.remove('text-primary', 'font-bold');
+      subnode.classList.add('text-on-surface-variant/70');
+      const dot = subnode.querySelector('.rounded-full');
+      if (dot) {
+        dot.classList.remove('bg-primary', 'glow-dot');
+        dot.classList.add('bg-outline-variant/50');
+      }
+    });
+  }
+
+  function highlightPipelineTree(module, operation, status) {
+    resetPipelineTree();
+
+    let targetNodeId = null;
+    let targetSubNodeId = null;
+
+    if (module === 'USER_INPUT') {
+      targetNodeId = 'tree-node-input';
+    } else if (module === 'API_CALL') {
+      targetNodeId = 'tree-node-bridge';
+    } else if (module === 'MCP_CALL') {
+      targetNodeId = 'tree-node-tools';
+      if (operation.includes('validate_cnpj')) {
+        targetSubNodeId = 'tree-tool-validate';
+      } else if (operation.includes('fetch_cnpj_data')) {
+        targetSubNodeId = 'tree-tool-fetch';
+      } else if (operation.includes('generate_audit_result')) {
+        targetSubNodeId = 'tree-tool-generate';
+      }
+    } else if (module === 'REASONING') {
+      targetNodeId = 'tree-node-model';
+    } else if (module === 'SYSTEM') {
+      targetNodeId = 'tree-node-output';
+    }
+
+    if (targetNodeId) {
+      const node = document.getElementById(targetNodeId);
+      if (node) {
+        const header = node.querySelector('.flex.items-center');
+        if (header) {
+          header.classList.add('bg-primary/20', 'text-primary');
+          header.classList.remove('text-on-surface-variant');
+        }
+        const children = node.querySelector('.pl-md');
+        if (children) {
+          children.classList.remove('hidden');
+        }
+        const chevron = node.querySelector('.material-symbols-outlined');
+        if (chevron && chevron.textContent === 'chevron_right') {
+          chevron.textContent = 'expand_more';
+        }
+      }
+    }
+
+    if (targetSubNodeId) {
+      const subnode = document.getElementById(targetSubNodeId);
+      if (subnode) {
+        subnode.classList.add('text-primary', 'font-bold');
+        subnode.classList.remove('text-on-surface-variant/70');
+        const dot = subnode.querySelector('.rounded-full');
+        if (dot) {
+          dot.classList.add('bg-primary', 'glow-dot');
+          dot.classList.remove('bg-outline-variant/50');
+        }
+      }
+    }
+  }
+
+  function initPipelineTree() {
+    const treeNodes = document.querySelectorAll('.tree-node');
+    treeNodes.forEach(node => {
+      const header = node.querySelector('.flex.items-center');
+      const children = node.querySelector('.pl-md');
+      const chevron = node.querySelector('.material-symbols-outlined');
+      
+      if (header && children && chevron) {
+        header.addEventListener('click', (e) => {
+          // Toggle child visibility
+          children.classList.toggle('hidden');
+          
+          // Toggle chevron text
+          if (children.classList.contains('hidden')) {
+            chevron.textContent = 'chevron_right';
+          } else {
+            chevron.textContent = 'expand_more';
+          }
+        });
+      }
+    });
+  }
+
   return { init };
 })();
 

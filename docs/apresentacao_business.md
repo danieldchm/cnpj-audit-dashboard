@@ -128,26 +128,26 @@ A ferramenta que transforma uma base de clientes esquecida em **oportunidades de
 
 ## Slide 6B — Resultados reais: um teste com ~5.000 clientes
 
-> Rodamos a ferramenta sobre uma base real de quase **5.000 empresas**. Destas, **3.602 foram auditadas** nesta execução. O que ela entregou:
+> Rodamos a ferramenta sobre uma base real de quase **5.000 empresas**. Destas, **4.301 foram auditadas** nesta execução. O que ela entregou:
 
 **De 5.000 nomes soltos para uma lista de "ligue para estes":**
-- 🎯 **64 oportunidades quentes** e **442 clientes prioritários** para o vendedor começar — em vez de encarar milhares de linhas no escuro.
-- 🗑️ **2.097 empresas já fechadas ou irregulares (quase 6 em cada 10)** foram tiradas do caminho automaticamente — ligações que seriam puro desperdício.
-- ✅ Sobraram **1.501 empresas realmente ativas** como universo de trabalho.
+- 🎯 **66 oportunidades quentes** e **505 clientes prioritários** para o vendedor começar — em vez de encarar milhares de linhas no escuro.
+- 🗑️ **2.446 empresas já fechadas ou irregulares (quase 6 em cada 10)** foram tiradas do caminho automaticamente — ligações que seriam puro desperdício.
+- ✅ Sobraram **1.851 empresas realmente ativas** como universo de trabalho.
 
 **A base estava muito mais suja do que parecia:**
 - **2 em cada 3 cadastros** estavam errados ou desatualizados.
-- **523 clientes** tinham informação divergente da Receita Federal.
+- **612 clientes** tinham informação divergente da Receita Federal.
 
 **Contato na mão:**
-- Telefone oficial recuperado para **1.822 empresas** (metade da base).
+- Telefone oficial recuperado para **2.275 empresas** (mais da metade da base).
 - E avisou de antemão quais **não têm contato nenhum** — poupando a tentativa frustrada.
 
 **Oportunidades que ninguém veria a olho nu:**
-- **354 grupos econômicos** (mesmo dono em vários clientes) → chance de vender mais para o mesmo grupo.
-- **115 casos de "empresa renascida"** (o dono fechou um CNPJ e abriu outro ativo) → clientes que pareciam perdidos e podem ser resgatados.
+- **513 grupos econômicos** (mesmo dono em vários clientes) → chance de vender mais para o mesmo grupo.
+- **172 casos de "empresa renascida"** (o dono fechou um CNPJ e abriu outro ativo) → clientes que pareciam perdidos e podem ser resgatados.
 
-> **Em resumo:** uma planilha parada de ~5 mil clientes virou **64 alvos quentes + 442 prioritários**, com **~2.100 ligações inúteis eliminadas** e **354 grupos de oportunidade** revelados — tudo numa execução, sem os dados saírem do computador.
+> **Em resumo:** uma planilha parada de ~5 mil clientes virou **66 alvos quentes + 505 prioritários**, com **~2.450 ligações inúteis eliminadas** e **513 grupos de oportunidade** revelados — tudo numa execução, sem os dados saírem do computador.
 
 *(Teste com base de demonstração; parte dos cadastros ficou pendente nesta rodada, então o ganho real tende a ser ainda maior ao concluir o processamento.)*
 

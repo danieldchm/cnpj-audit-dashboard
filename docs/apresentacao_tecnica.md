@@ -240,36 +240,36 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 
 ## Slide 8B — Resultados reais (estudo de caso: ~5.000 CNPJs)
 
-> Números extraídos de uma **execução real** da ferramenta sobre uma base de ~5.000 clientes (export `auditbase_state`, 19/jun). **3.602 CNPJs efetivamente auditados** (1.394 ficaram pendentes por rate-limit da BrasilAPI nesta rodada).
+> Números extraídos de uma **execução real** da ferramenta sobre uma base de ~5.000 clientes (export `auditbase_state`, 19/jun). **4.301 CNPJs efetivamente auditados** (698 ficaram pendentes por rate-limit da BrasilAPI nesta rodada).
 
 **O funil gerado — de planilha morta a alvos acionáveis:**
 
 | Etapa | Volume | % dos auditados |
 |---|---|---|
 | Cadastros na planilha | 4.999 | — |
-| CNPJs auditados | 3.602 | 100% |
-| Empresas **ATIVAS** (universo trabalhável) | 1.501 | 41,7% |
-| **Fila priorizada** (score ≥ 40 — vale ligar) | 442 | 12,3% |
-| 🔥 **Oportunidades quentes** (score ≥ 70) | 64 | 1,8% |
+| CNPJs auditados | 4.301 | 100% |
+| Empresas **ATIVAS** (universo trabalhável) | 1.851 | 43,0% |
+| **Fila priorizada** (score ≥ 40 — vale ligar) | 505 | 11,7% |
+| 🔥 **Oportunidades quentes** (score ≥ 70) | 66 | 1,5% |
 
 **Esforço perdido eliminado:**
-- **2.097 empresas (58,2%) mortas/irregulares** filtradas automaticamente (1.411 BAIXADAS, 670 INAPTAS, 16 SUSPENSAS) → ~6 de cada 10 ligações deixaram de ser desperdiçadas.
+- **2.446 empresas (56,9%) mortas/irregulares** filtradas automaticamente (1.637 BAIXADAS, 789 INAPTAS, 20 SUSPENSAS) → ~6 de cada 10 ligações deixaram de ser desperdiçadas.
 
 **Higiene cadastral:**
-- **65,1%** dos cadastros inválidos/desatualizados (2.346) · **523 divergências** interno × Receita (14,5%).
+- **63,8%** dos cadastros inválidos/desatualizados (2.745) · **612 divergências** interno × Receita (14,2%).
 
 **Recuperação de contato:**
-- Telefone oficial recuperado para **1.822 empresas (50,6%)**; **1.780 (49,4%) sem canal** sinalizadas de antemão (a API não retornou e-mails).
+- Telefone oficial recuperado para **2.275 empresas (52,9%)**; **2.026 (47,1%) sem canal** sinalizadas de antemão (a API não retornou e-mails).
 
 **Inteligência de grafo (QSA) — o "pulo do gato", comprovado:**
-- **354 grupos econômicos** (mesmo sócio em 2+ clientes → 388 empresas) → upsell / negociação de volume.
-- **115 sinais de reabertura** (sócio com CNPJ baixado **+** ativo) → resgate de cliente "perdido".
+- **513 grupos econômicos** (mesmo sócio em 2+ clientes → 565 empresas) → upsell / negociação de volume.
+- **172 sinais de reabertura** (sócio com CNPJ baixado **+** ativo) → resgate de cliente "perdido".
 
-**Escala:** cruzar 3.602 CNPJs manualmente (~2–3 min/consulta) custaria **~120–180 h** — feito em uma execução, client-side, sem a base sair do navegador.
+**Escala:** cruzar 4.301 CNPJs manualmente (~2–3 min/consulta) custaria **~140–215 h** — feito em uma execução, client-side, sem a base sair do navegador.
 
-> **Leitura:** de ~5 mil linhas mortas, a ferramenta entregou **64 alvos quentes + 442 prioritários**, evitou **~2.100 ligações inúteis**, corrigiu 2/3 da base e revelou **354 grupos econômicos** e **115 reaberturas** — numa só execução.
+> **Leitura:** de ~5 mil linhas mortas, a ferramenta entregou **66 alvos quentes + 505 prioritários**, evitou **~2.450 ligações inúteis**, corrigiu 2/3 da base e revelou **513 grupos econômicos** e **172 reaberturas** — numa só execução.
 
-*Ressalvas de rastreabilidade: dataset de teste/anonimizado; o campo "vendedor" não estava preenchido (scorecard por vendedor não exercido nesta amostra); capital social absoluto descartado por outliers (mediana R$ 50.000, coerente com o ICP de pequeno varejo).*
+*Ressalvas de rastreabilidade: dataset de teste/anonimizado; o campo "vendedor" não estava preenchido (scorecard por vendedor não exercido nesta amostra); capital social absoluto descartado por outliers (mediana R$ 62.200, coerente com o ICP de pequeno varejo).*
 
 ---
 
