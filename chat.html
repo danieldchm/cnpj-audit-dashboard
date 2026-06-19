@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AuditBase | Assistente MCP</title>
+  <meta name="description" content="Interface dedicada para o Assistente MCP e auditoria local do AuditBase">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=1.6">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🤖</text></svg>">
+  <style>
+    body {
+      background-color: var(--bg-primary);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text-primary);
+    }
+    
+    .chat-layout {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* Sidebar */
+    .chat-sidebar {
+      width: 320px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-default);
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+    
+    .sidebar-header {
+      margin-bottom: 24px;
+    }
+    
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    
+    .sidebar-logo h1 {
+      font-size: 1.3rem;
+      margin: 0;
+      font-weight: 700;
+      background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    .sidebar-logo span {
+      background: rgba(96, 165, 250, 0.1);
+      color: var(--blue-400);
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-weight: 600;
+      border: 1px solid rgba(96, 165, 250, 0.2);
+    }
+    
+    .sidebar-desc {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+      margin: 0 0 16px 0;
+    }
+    
+    .sidebar-section {
+      margin-top: 8px;
+      flex-grow: 1;
+      overflow-y: auto;
+    }
+    
+    .sidebar-section-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+    
+    .mcp-tool-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    
+    .mcp-tool-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--purple-400);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .mcp-tool-desc {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      line-height: 1.3;
+    }
+    
+    .sidebar-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 24px;
+      border-top: 1px solid var(--border-default);
+      padding-top: 20px;
+    }
+    
+    .sidebar-footer .btn {
+      width: 100%;
+      text-align: center;
+      justify-content: center;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      padding: 10px 16px;
+      text-decoration: none;
+      box-sizing: border-box;
+      border-radius: 8px;
+    }
+    
+    /* Main Area */
+    .chat-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: var(--bg-primary);
+      position: relative;
+    }
+    
+    /* Chat Header / Diagnostics */
+    .chat-topbar {
+      height: 70px;
+      border-bottom: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      background: rgba(6, 10, 19, 0.8);
+      backdrop-filter: blur(20px);
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    
+    .diag-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .diag-badges {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #6b7280;
+      display: inline-block;
+    }
+    
+    .status-dot.online {
+      background: var(--green-400);
+      box-shadow: 0 0 8px var(--green-500);
+    }
+    
+    .status-dot.offline {
+      background: var(--red-400);
+      box-shadow: 0 0 8px var(--red-500);
+    }
+    
+    .status-dot.checking {
+      background: var(--yellow-400);
+      box-shadow: 0 0 8px var(--yellow-500);
+      animation: pulse 1s infinite alternate;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+    
+    /* Chat Content Area */
+    .chat-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 40px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .chat-content-wrap {
+      width: 100%;
+      max-width: 850px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    
+    .chat-history-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex-grow: 1;
+    }
+    
+    /* Welcome screen */
+    .welcome-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin: auto 0;
+      padding: 40px 20px;
+    }
+    
+    .welcome-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+      animation: float 4s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    
+    .welcome-screen h2 {
+      font-size: 1.6rem;
+      margin: 0 0 8px 0;
+      font-weight: 700;
+    }
+    
+    .welcome-screen p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      max-width: 500px;
+      margin: 0 0 28px 0;
+      line-height: 1.5;
+    }
+    
+    .welcome-suggestions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      width: 100%;
+      max-width: 600px;
+    }
+    
+    .suggestion-btn {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+      padding: 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .suggestion-btn:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--blue-500);
+      transform: translateY(-2px);
+    }
+    
+    .suggestion-btn span.title {
+      font-weight: 600;
+      color: var(--blue-400);
+    }
+    
+    /* Messages */
+    .message-row {
+      display: flex;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+    
+    .message-row.user {
+      justify-content: flex-end;
+    }
+    
+    .message-row.assistant {
+      justify-content: flex-start;
+    }
+    
+    .message-bubble {
+      max-width: 80%;
+      padding: 16px 20px;
+      border-radius: 14px;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+    
+    .message-row.user .message-bubble {
+      background: linear-gradient(135deg, var(--blue-600) 0%, #1e40af 100%);
+      color: white;
+      border-bottom-right-radius: 2px;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    }
+    
+    .message-row.assistant .message-bubble {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+      border-bottom-left-radius: 2px;
+      box-shadow: var(--shadow-sm);
+    }
+    
+    /* Format elements in assistant bubble */
+    .message-bubble p {
+      margin: 0 0 12px 0;
+    }
+    
+    .message-bubble p:last-child {
+      margin-bottom: 0;
+    }
+    
+    .message-bubble strong {
+      color: #fff;
+    }
+    
+    .message-bubble code {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #f472b6;
+    }
+    
+    .message-bubble pre {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 14px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 10px 0;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .message-bubble pre code {
+      background: transparent;
+      padding: 0;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+    }
+    
+    .message-bubble ul, .message-bubble ol {
+      margin: 0 0 12px 0;
+      padding-left: 20px;
+    }
+    
+    .message-bubble li {
+      margin-bottom: 6px;
+    }
+    
+    /* Academic/Thought blocks inside assistant message */
+    .mcp-thought-block {
+      background: rgba(167, 139, 250, 0.06);
+      border-left: 3px solid var(--purple-400);
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+      color: var(--purple-400);
+    }
+    
+    .mcp-thought-title {
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--purple-400);
+    }
+    
+    /* Typing indicator */
+    .typing-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+    }
+    
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-secondary);
+      animation: typing-bounce 1.4s infinite ease-in-out both;
+    }
+    
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    
+    @keyframes typing-bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+    
+    /* Input Area */
+    .chat-input-container {
+      width: 100%;
+      max-width: 850px;
+      padding: 0 24px 32px 24px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: linear-gradient(180deg, transparent 0%, var(--bg-primary) 30%);
+      flex-shrink: 0;
+    }
+    
+    .input-box {
+      width: 100%;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-default);
+      border-radius: 12px;
+      padding: 6px 6px 6px 16px;
+      display: flex;
+      align-items: center;
+      box-shadow: var(--shadow-md);
+      box-sizing: border-box;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .input-box:focus-within {
+      border-color: var(--blue-500);
+      box-shadow: var(--shadow-glow-blue);
+    }
+    
+    .input-box input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      padding: 12px 0;
+      font-family: inherit;
+    }
+    
+    .input-box input:focus {
+      outline: none;
+    }
+    
+    .input-box button {
+      background: var(--blue-600);
+      border: none;
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s, transform 0.2s;
+    }
+    
+    .input-box button:hover {
+      background: var(--blue-500);
+      transform: scale(1.02);
+    }
+    
+    .input-box button:disabled {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .input-footer-text {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    /* Custom Scrollbar Styles for premium feel */
+    .chat-body::-webkit-scrollbar,
+    .chat-sidebar::-webkit-scrollbar,
+    .sidebar-section::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    
+    .chat-body::-webkit-scrollbar-track,
+    .chat-sidebar::-webkit-scrollbar-track,
+    .sidebar-section::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .chat-body::-webkit-scrollbar-thumb,
+    .chat-sidebar::-webkit-scrollbar-thumb,
+    .sidebar-section::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+    }
+    
+    .chat-body::-webkit-scrollbar-thumb:hover,
+    .chat-sidebar::-webkit-scrollbar-thumb:hover,
+    .sidebar-section::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Toggle & Drawer buttons */
+    .btn-toggle-sidebar {
+      display: none;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 8px;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s;
+      border: 1px solid var(--border-subtle);
+    }
+    
+    .btn-toggle-sidebar:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-close-sidebar {
+      display: none;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    
+    .btn-close-sidebar:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .sidebar-overlay {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      z-index: 90;
+      transition: opacity 0.3s ease;
+    }
+    .sidebar-overlay.active {
+      display: block;
+    }
+
+    .mobile-only-badges-title,
+    .mobile-only-badges {
+      display: none;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .btn-toggle-sidebar {
+        display: flex;
+      }
+
+      .btn-close-sidebar {
+        display: flex;
+      }
+
+      .chat-sidebar {
+        position: absolute;
+        left: -320px;
+        top: 0;
+        bottom: 0;
+        z-index: 100;
+        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
+      }
+
+      .chat-sidebar.active {
+        left: 0;
+      }
+
+      .chat-main {
+        width: 100%;
+      }
+
+      .chat-topbar {
+        padding: 0 16px;
+      }
+
+      .diag-badges {
+        display: none;
+      }
+
+      .mobile-only-badges-title,
+      .mobile-only-badges {
+        display: block;
+      }
+
+      .chat-body {
+        padding: 24px 16px;
+      }
+
+      .chat-input-container {
+        padding: 0 16px 20px 16px;
+      }
+      
+      .welcome-screen h2 {
+        font-size: 1.4rem;
+      }
+      
+      .welcome-suggestions {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <div class="chat-layout">
+    <!-- Sidebar / Academic Panel -->
+    <aside class="chat-sidebar" id="chat-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <h1>AuditBase</h1>
+          <span>MCP IA</span>
+          <button id="btn-close-sidebar" class="btn-close-sidebar" aria-label="Fechar ferramentas">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <p class="sidebar-desc">
+          Ambiente acadêmico para experimentação do protocolo Model Context Protocol (MCP).
+        </p>
+      </div>
+      
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">MCP Tools Registradas</div>
+        
+        <div class="mcp-tool-card">
+          <div class="mcp-tool-name">validate_cnpj</div>
+          <div class="mcp-tool-desc">Faz a validação matemática e de integridade dos dígitos verificadores do CNPJ.</div>
+        </div>
+        
+        <div class="mcp-tool-card">
+          <div class="mcp-tool-name">fetch_cnpj_data</div>
+          <div class="mcp-tool-desc">Consulta dados oficiais cadastrais do CNPJ diretamente na API da Receita Federal (BrasilAPI).</div>
+        </div>
+        
+        <div class="mcp-tool-card">
+          <div class="mcp-tool-name">generate_audit_result</div>
+          <div class="mcp-tool-desc">Executa a pipeline de auditoria unindo dados cadastrais, score de saúde Distribuidora e web intelligence.</div>
+        </div>
+      </div>
+      
+      <!-- Mobile-only status section -->
+      <div class="sidebar-section mobile-only-badges-section" style="margin-top: 20px; flex-grow: 0; border-top: 1px solid var(--border-default); padding-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+        <div class="sidebar-section-title mobile-only-badges-title" style="margin-bottom: 4px;">Status Conexão</div>
+        <div class="mobile-only-badges" style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="status-badge" style="justify-content: flex-start; padding: 6px 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); border-radius: 6px; font-size: 0.75rem; display: flex; align-items: center; gap: 8px;">
+            <span id="dot-bridge-mobile" class="status-dot checking"></span> Node Bridge
+          </div>
+          <div class="status-badge" style="justify-content: flex-start; padding: 6px 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); border-radius: 6px; font-size: 0.75rem; display: flex; align-items: center; gap: 8px;">
+            <span id="dot-ollama-mobile" class="status-dot checking"></span> Ollama
+          </div>
+          <div class="status-badge" style="justify-content: flex-start; padding: 6px 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); border-radius: 6px; font-size: 0.75rem; display: flex; align-items: center; gap: 8px;">
+            <span id="dot-mcp-mobile" class="status-dot checking"></span> MCP Server
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar-footer">
+        <button id="btn-clear-chat" class="btn btn-secondary">
+          🧹 Limpar Conversa
+        </button>
+        <a href="index.html" class="btn btn-secondary">
+          🏠 Voltar ao Dashboard
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="chat-main">
+      <!-- Top Diagnostics Bar -->
+      <header class="chat-topbar">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button id="btn-toggle-sidebar" class="btn-toggle-sidebar" aria-label="Alternar ferramentas">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div class="diag-title">
+            🤖 Assistente IA Local <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 8px;">(Ollama + Bridge MCP)</span>
+          </div>
+        </div>
+        <div class="diag-badges">
+          <div class="status-badge" title="Bridge Node rodando na porta 3001">
+            <span id="dot-bridge" class="status-dot checking"></span> Node Bridge
+          </div>
+          <div class="status-badge" title="Servidor Ollama rodando localmente na porta 11434">
+            <span id="dot-ollama" class="status-dot checking"></span> Ollama
+          </div>
+          <div class="status-badge" title="Status da conexão stdio com mcp-server">
+            <span id="dot-mcp" class="status-dot checking"></span> MCP Server
+          </div>
+        </div>
+      </header>
+
+      <!-- Chat Messages Scroll Container -->
+      <section class="chat-body" id="chat-body">
+        <div class="chat-content-wrap">
+          <div class="chat-history-container" id="mcp-chat-history">
+            <!-- Dynamic elements will be inserted here -->
+            <div class="welcome-screen" id="welcome-screen">
+              <div class="welcome-icon">🎓</div>
+              <h2>Demonstração Acadêmica MCP</h2>
+              <p>
+                Este chat permite interagir localmente com o modelo Qwen 2.5 Coder (7B). Ele usará ferramentas do protocolo MCP para consultar o AuditBase em tempo real. Faça perguntas didáticas sobre auditorias.
+              </p>
+              
+              <div class="welcome-suggestions">
+                <button class="suggestion-btn" onclick="sendSuggestion('Faça uma auditoria no CNPJ 19.131.243/0001-97')">
+                  <span class="title">📋 Processo de Auditoria Completo</span>
+                  <span>"Faça uma auditoria no CNPJ 19.131.243/0001-97"</span>
+                </button>
+                <button class="suggestion-btn" onclick="sendSuggestion('Valide se o CNPJ 00.000.000/0000-00 está correto')">
+                  <span class="title">🛡️ Validação Matemática</span>
+                  <span>"Valide se o CNPJ 00.000.000/0000-00 está correto"</span>
+                </button>
+                <button class="suggestion-btn" onclick="sendSuggestion('Busque os dados cadastrais da receita para o CNPJ 45.997.418/0001-53')">
+                  <span class="title">🌐 Consulta Cadastral</span>
+                  <span>"Busque os dados da receita para o CNPJ 45.997.418/0001-53"</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Input Field -->
+      <footer class="chat-input-container">
+        <div class="input-box">
+          <input type="text" id="mcp-input" placeholder="Pergunte ao modelo (ex: faça auditoria no CNPJ 19.131.243/0001-97)..." autocomplete="off" autofocus>
+          <button id="mcp-send-btn" aria-label="Enviar mensagem">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <div class="input-footer-text">
+          AuditBase MCP Interface · Qwen 2.5 Coder 7B via Ollama local
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <script src="chat.js?v=2.0"></script>
+</body>
+</html>
