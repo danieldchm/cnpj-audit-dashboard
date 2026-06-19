@@ -481,7 +481,15 @@ const App = (function () {
 
     showToast('Processamento iniciado! Consultando BrasilAPI...', 'info');
 
-    await API.processBatch(clients, onBatchProgress, { delayMs: 300, concurrency: 3 });
+    await API.processBatch(clients, onBatchProgress, {
+      delayMs: 300,
+      concurrency: 3,
+      onStart: (idx) => {
+        results[idx].status = 'processing';
+        applyFilters();
+        updateMetrics();
+      }
+    });
 
     // Processing finished
     isProcessing = false;
@@ -558,7 +566,12 @@ const App = (function () {
     await API.processBatch(clients, onBatchProgress, { 
       delayMs: 300, 
       concurrency: 3, 
-      indices: erroredIndices 
+      indices: erroredIndices,
+      onStart: (idx) => {
+        results[idx].status = 'processing';
+        applyFilters();
+        updateMetrics();
+      }
     });
 
     // Processing finished
@@ -627,10 +640,7 @@ const App = (function () {
       }
     }
 
-    // Mark next as processing if exists
-    if (index + 1 < total) {
-      results[index + 1].status = 'processing';
-    }
+    // Next processing status is handled dynamically by onStart callback
 
     // Update progress
     const processed = index + 1;

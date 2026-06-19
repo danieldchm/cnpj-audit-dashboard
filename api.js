@@ -307,6 +307,14 @@ const API = (function () {
           const i = targetIndices[idx];
           const client = clients[i];
           
+          if (typeof options.onStart === 'function') {
+            try {
+              options.onStart(i);
+            } catch (startErr) {
+              console.error('processBatch: onStart callback error:', startErr);
+            }
+          }
+
           const result = await processClient(client);
           results[i] = result;
           completedCount++;
