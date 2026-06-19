@@ -86,11 +86,14 @@ Expõe toda a lógica pesada de negócio (validações matemáticas de CNPJ e a 
 ```
 
 ### 2. Assistente MCP Local Integrado (`chat.html` & `mcp-bridge/`)
-Criamos uma aba standalone e interativa para chat com IA. Ela se comunica com o **Ollama local** rodando o modelo `qwen2.5-coder:7b` e utiliza o protocolo MCP via uma ponte local (`mcp-bridge/`) para buscar dados do AuditBase em tempo real.
-- **Design UI de Alta Fidelidade (MCP Inspector):** O visual de console/inspetor hacker de alta tecnologia foi concebido e prototipado utilizando a ferramenta **Stitch** (stitch.withgoogle.com).
-- **Storytelling Acadêmico:** O assistente descreve seu raciocínio, exibindo uma caixa roxa destacada com as chamadas de ferramentas MCP realizadas durante a conversa.
-- **Diagnóstico em Tempo Real:** Possui badges no topo do chat monitorando a integridade da ponte Express, do Ollama e da conexão stdio com o MCP Server.
-- **Responsividade Total:** Adaptado e colapsável para dispositivos móveis.
+Criamos uma aba standalone e interativa para chat com IA. Ela se comunica com o **Ollama local** rodando o modelo `qwen2.5-coder:7b` (ou similar) e utiliza o protocolo MCP via uma ponte local (`mcp-bridge/`) para buscar dados do AuditBase em tempo real.
+- **Design UI de Alta Fidelidade (MCP Inspector):** O visual premium de console/inspetor hacker de alta tecnologia foi concebido e prototipado utilizando a ferramenta **Stitch** (stitch.withgoogle.com).
+- **Três Painéis com Splitters Dinâmicos (Redimensionamento):** Alças verticais (`#sidebar-resizer`) e horizontais (`#footer-resizer`) permitem redimensionar a barra lateral (220px a 600px) e o rodapé de logs (64px a 450px) dinamicamente via clique-e-arrasto. Os splitters contam com efeitos visuais e cursor interativo. Em dispositivos móveis, as alças de redimensionamento são ocultadas automaticamente e o painel lateral vira uma gaveta colapsável.
+- **Terminal de Logs de Atividade em Tempo Real:** Rodapé interativo com um feed contínuo que registra cada transação e evento do protocolo MCP (ex: `USER_INPUT`, `API_CALL`, `MCP_CALL`, `REASONING`), exibindo timestamps precisos, latência em ms e status de execução.
+- **Simulador de Carga de CPU:** Widget gráfico no painel lateral direito que exibe o monitoramento dinâmico e simulado de processamento de CPU da máquina local, subindo para 70-90% quando a IA gera respostas e voltando a 1% quando ociosa.
+- **Atalhos Rápidos e Triggers na Sidebar:** A barra lateral expõe a lista de ferramentas registradas no servidor MCP, permitindo clicar sobre qualquer uma delas para preencher ou rodar consultas automáticas no chat.
+- **Storytelling Acadêmico & Reasoning Core:** O assistente expõe seu fluxo de pensamentos de forma transparente. O bloco de marcação `[Raciocínio MCP]` é extraído da conversa e exibido de forma destacada em tempo real em um painel fixo ("Reasoning Core") na lateral direita e em balões estilizados no histórico.
+- **Diagnóstico de Conectividade:** Monitoramento automatizado (via polling de status de 5 segundos) da integridade da *Node Bridge*, do *Ollama local* e do *MCP Server*, com badges verdes/vermelhos e alertas globais (`SYSTEM_OPERATIONAL` / `SYSTEM_DEGRADED`).
 
 ## 🗺️ Roadmap: Evolução em Direção a CRM
 
@@ -169,6 +172,11 @@ node run_local.js
 - [x] Exportação CSV com 40+ campos da Receita Federal enriquecidos
 - [x] Painel de Insights Inteligentes (Perfil Operacional e Ligações Diretas)
 - [x] Servidor MCP (Integração de Agentes IAs)
+- [x] Assistente MCP Local com Chat High-Tech Polish (Stitch)
+- [x] Três painéis redimensionáveis via Splitters interativos (Sidebar e Terminal de Logs)
+- [x] Terminal de logs de atividade dinâmico com timestamps e latências em ms
+- [x] Monitor de status de conexões em tempo real (Bridge, Ollama, MCP Server)
+- [x] Bloco de Raciocínio (Reasoning Core) e simulador gráfico de carga de CPU
 
 ## 📄 Licença
 
