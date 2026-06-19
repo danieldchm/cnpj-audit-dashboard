@@ -31,6 +31,10 @@ build/
 tmp/
 temp/
 
+# Artefatos de debug local (respostas de API e scripts descartáveis)
+/api_response.json
+/test_api.js
+
 # FUSE filesystem temp artifacts (deleted-but-open files)
 .fuse_hidden*
 

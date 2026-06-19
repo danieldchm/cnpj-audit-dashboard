@@ -34,7 +34,8 @@ const Dashboard = (function () {
   const esc = (s) => {
     const d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
-    return d.innerHTML;
+    // Escapa aspas também, para uso seguro em atributos (title="…", href="tel:…")
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   };
 
   // ───────────────────────────────────────────────

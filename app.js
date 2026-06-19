@@ -13,6 +13,7 @@ const App = (function () {
   let selectedIndex = -1;     // Currently selected row index
   let isProcessing = false;
   let processingStartTime = null;
+  let _lastFocused = null;     // elemento focado antes de abrir o painel (a11y)
 
   // Atualiza o dashboard analítico (Visão Geral / Inteligência / Plano).
   function renderDashboard() {
@@ -28,6 +29,18 @@ const App = (function () {
     (typeof Utils !== 'undefined' && Utils.debounce)
       ? Utils.debounce(saveSession, 500)
       : saveSession;
+
+  // Versões estranguladas das atualizações de UI mais caras (filtro + métricas).
+  // Sem isto, re-filtrar a base inteira e reanimar as métricas a CADA CNPJ
+  // durante o batch é O(n²) e congela a aba com 10k+ linhas.
+  const applyFiltersThrottled =
+    (typeof Utils !== 'undefined' && Utils.throttle)
+      ? Utils.throttle(applyFilters, 400)
+      : applyFilters;
+  const updateMetricsThrottled =
+    (typeof Utils !== 'undefined' && Utils.throttle)
+      ? Utils.throttle(updateMetrics, 400)
+      : updateMetrics;
 
   // ─── DOM References ─────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
@@ -161,6 +174,15 @@ const App = (function () {
     dom.filterStatus.addEventListener('change', applyFilters);
     dom.filterPriority.addEventListener('change', applyFilters);
     dom.filterVendedor.addEventListener('change', applyFilters);
+
+    // Acesso por teclado às linhas da tabela (Enter / Espaço abrem o detalhe)
+    dom.tableBody.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const row = e.target.closest('tr[data-index]');
+      if (!row) return;
+      e.preventDefault();
+      openDetailPanel(Number(row.dataset.index));
+    });
 
     // Pagination
     dom.pageNext.addEventListener('click', () => goToPage(currentPage + 1));
@@ -486,8 +508,8 @@ const App = (function () {
       concurrency: 3,
       onStart: (idx) => {
         results[idx].status = 'processing';
-        applyFilters();
-        updateMetrics();
+        applyFiltersThrottled();
+        updateMetricsThrottled();
       }
     });
 
@@ -518,6 +540,9 @@ const App = (function () {
     const processed = results.filter(r => r.status !== 'pending' && r.status !== 'error').length;
     showToast(`Processamento finalizado! ${processed}/${clients.length} CNPJs com sucesso.`, 'success');
 
+    // Flush final exato (as versões throttled podem ter um trailing call pendente)
+    applyFilters();
+    updateMetrics();
     renderDashboard();
     saveSession();
   }
@@ -569,8 +594,8 @@ const App = (function () {
       indices: erroredIndices,
       onStart: (idx) => {
         results[idx].status = 'processing';
-        applyFilters();
-        updateMetrics();
+        applyFiltersThrottled();
+        updateMetricsThrottled();
       }
     });
 
@@ -601,11 +626,14 @@ const App = (function () {
     const processed = results.filter(r => r.status !== 'pending' && r.status !== 'error').length;
     showToast(`Processamento finalizado! ${processed}/${clients.length} CNPJs com sucesso.`, 'success');
 
+    // Flush final exato (as versões throttled podem ter um trailing call pendente)
+    applyFilters();
+    updateMetrics();
     renderDashboard();
     saveSession();
   }
 
-  function onBatchProgress(index, total, result) {
+  function onBatchProgress(index, total, result, completed, totalTarget) {
     // Update result for this client
     if (result._status === 'error') {
       results[index] = {
@@ -642,21 +670,24 @@ const App = (function () {
 
     // Next processing status is handled dynamically by onStart callback
 
-    // Update progress
-    const processed = index + 1;
-    const pct = (processed / total * 100).toFixed(1);
+    // Update progress — usa o contador real de concluídos do engine (robusto à
+    // concorrência fora de ordem e ao modo "Reexecutar Erros", em que o total
+    // processado é menor que clients.length).
+    const processed = completed != null ? completed : index + 1;
+    const denom = totalTarget != null ? totalTarget : total;
+    const pct = (processed / denom * 100).toFixed(1);
     dom.progressBar.style.width = pct + '%';
-    dom.progressCurrent.textContent = `Processando ${processed} de ${total}... (${Utils.formatCNPJ(clients[index].cnpj)})`;
+    dom.progressCurrent.textContent = `Processando ${processed} de ${denom}... (${Utils.formatCNPJ(clients[index].cnpj)})`;
 
     // ETA calculation
     const elapsed = Date.now() - processingStartTime;
     const avgTime = elapsed / processed;
-    const remaining = avgTime * (total - processed);
+    const remaining = avgTime * (denom - processed);
     dom.progressEta.textContent = `Estimativa restante: ${formatDuration(remaining)}`;
 
-    // Update table and metrics
-    applyFilters();
-    updateMetrics();
+    // Update table and metrics (estrangulados — ver applyFiltersThrottled)
+    applyFiltersThrottled();
+    updateMetricsThrottled();
     renderDashboardThrottled();
 
     // If detail panel is open for this row, refresh it
@@ -822,7 +853,7 @@ const App = (function () {
         situacaoHtml = `<span class="badge ${bgClass} bg-opacity-10" style="font-size: 0.7rem; padding: 2px 6px;">${situacao}</span>`;
       }
 
-      html += `<tr class="${isHighlighted ? 'highlighted' : ''} ${isActive ? 'active-row' : ''}" data-index="${idx}" onclick="App.openDetailPanel(${idx})">`;
+      html += `<tr class="${isHighlighted ? 'highlighted' : ''} ${isActive ? 'active-row' : ''}" data-index="${idx}" tabindex="0" role="button" aria-label="Abrir detalhes de ${escapeHtml(client.razao_social) || Utils.formatCNPJ(client.cnpj)}" onclick="App.openDetailPanel(${idx})">`;
       html += `<td class="row-num">${idx + 1}</td>`;
       html += `<td class="cnpj-cell">${Utils.formatCNPJ(client.cnpj)}</td>`;
       html += `<td class="razao-cell" title="${escapeHtml(client.razao_social)}">${escapeHtml(client.razao_social) || '<span class="text-muted">—</span>'}</td>`;
@@ -957,6 +988,8 @@ const App = (function () {
 
   // ─── Detail Panel ───────────────────────────────────────────
   function openDetailPanel(index) {
+    // Guarda o foco atual para restaurá-lo ao fechar (navegação por teclado)
+    _lastFocused = document.activeElement;
     selectedIndex = index;
     dom.detailPanel.classList.add('open');
     dom.detailOverlay.classList.add('open');
@@ -964,14 +997,30 @@ const App = (function () {
 
     populateDetailPanel(index);
     renderTable(); // Re-render to highlight active row
+
+    // Move o foco para dentro do diálogo
+    if (dom.detailClose) dom.detailClose.focus();
   }
 
   function closeDetailPanel() {
+    const wasOpen = dom.detailPanel.classList.contains('open');
+    const closedIndex = selectedIndex;
     selectedIndex = -1;
     dom.detailPanel.classList.remove('open');
     dom.detailOverlay.classList.remove('open');
     document.body.style.overflow = '';
     renderTable();
+
+    // Restaura o foco: de preferência o próprio elemento; se a tabela foi
+    // reconstruída (linha original destacada do DOM), foca a linha equivalente.
+    if (wasOpen) {
+      let target = (_lastFocused && document.contains(_lastFocused)) ? _lastFocused : null;
+      if (!target && closedIndex >= 0) {
+        target = dom.tableBody.querySelector(`tr[data-index="${closedIndex}"]`);
+      }
+      if (target && typeof target.focus === 'function') target.focus();
+    }
+    _lastFocused = null;
   }
 
   function populateDetailPanel(index) {
@@ -1618,7 +1667,9 @@ const App = (function () {
     if (!str) return '';
     const div = document.createElement('div');
     div.textContent = str;
-    return div.innerHTML;
+    // innerHTML escapa < > & mas NÃO aspas — escapamos manualmente para que o
+    // valor seja seguro também em contextos de ATRIBUTO (title="…", value="…").
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   // ─── Public API ─────────────────────────────────────────────

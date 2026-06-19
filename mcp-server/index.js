@@ -35,6 +35,7 @@ const apiContext = {
   Math: Math,
   Utils: Utils,
   fetch: global.fetch,
+  AbortController: global.AbortController, // habilita o timeout de fetch (fetchWithTimeout)
 };
 vm.createContext(apiContext);
 vm.runInContext(apiCode, apiContext);

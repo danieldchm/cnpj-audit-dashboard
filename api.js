@@ -34,6 +34,27 @@ const API = (function () {
   /** @type {number} Extra wait time (ms) when the API returns 429. */
   const RATE_LIMIT_WAIT_MS = 5000;
 
+  /** @type {number} Per-request timeout (ms). Evita worker pendurado em conexão half-open. */
+  const REQUEST_TIMEOUT_MS = 15000;
+
+  /**
+   * fetch com timeout via AbortController. Um abort cai no catch de
+   * {@link fetchCNPJData} e aciona o retry/backoff já existente.
+   * Degrada com elegância em ambientes sem AbortController (VM de testes).
+   *
+   * @param {string} url
+   * @param {number} timeoutMs
+   * @returns {Promise<Response>}
+   */
+  function fetchWithTimeout(url, timeoutMs) {
+    if (typeof AbortController === 'undefined') {
+      return fetch(url);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
+  }
+
   // ───────────────────────────────────────────────
   // BrasilAPI
   // ───────────────────────────────────────────────
@@ -74,7 +95,7 @@ const API = (function () {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const response = await fetch(url);
+        const response = await fetchWithTimeout(url, REQUEST_TIMEOUT_MS);
 
         // --- 404: not found, no retry ---
         if (response.status === 404) {
@@ -269,8 +290,9 @@ const API = (function () {
    * - Supports cancellation via {@link cancelBatch}.
    *
    * @param {Array<Object>} clients - Array of client data objects from CSV.
-   * @param {function(number, number, Object): void} onProgress
-   *   Callback invoked after each client: `(currentIndex, totalCount, result)`.
+   * @param {function(number, number, Object, number, number): void} onProgress
+   *   Callback invoked after each client:
+   *   `(clientIndex, clientsLength, result, completedCount, targetCount)`.
    * @param {{ delayMs?: number }} [options={ delayMs: 1500 }]
    *   Processing options.
    * @returns {Promise<Array<Object>>} Resolves with array of all audit results
@@ -321,7 +343,9 @@ const API = (function () {
 
           if (typeof onProgress === 'function') {
             try {
-              onProgress(i, clients.length, result);
+              // Passa o contador REAL de concluídos e o total-alvo, para a barra
+              // de progresso/ETA ficar correta sob concorrência e no modo retry.
+              onProgress(i, clients.length, result, completedCount, targetIndices.length);
             } catch (cbErr) {
               console.error('processBatch: onProgress callback error:', cbErr);
             }
