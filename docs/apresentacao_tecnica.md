@@ -141,7 +141,7 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 5. *"A abordagem do vendedor tem que mudar conforme o segmento."*
    → **Ângulo de abordagem contextual por CNAE** (papelaria, livraria, escola, gráfica…) escrito direto na ação recomendada.
 
-**Cada commit é uma rodada de intenção** — 25 commits documentam a conversa "pedido de negócio → ajuste".
+**Cada commit é uma rodada de intenção** — mais de 100 commits documentam a conversa "pedido de negócio → ajuste".
 
 ---
 
@@ -223,7 +223,7 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 | Linhas de **CSS** (design system próprio) | **2.505** |
 | **Módulos** client-side arquiteturados | **7** (+ servidor MCP + bridge local) |
 | **Funções** implementadas | **255+** |
-| **Commits** (histórico da iteração) | **68** |
+| **Commits** (histórico da iteração) | **100+** (≈110 somando todas as branches) |
 | **Campos enriquecidos** no export | **40+** |
 | **Gráficos** analíticos | **8** |
 | **Módulos de inferência** agregada | **10** |
@@ -332,7 +332,7 @@ Valor entregue
 2. **Brief** com intenção, usuário, dados e restrições (client-side, ICP varejo).
 3. **Protótipo** modular desde o início (6 módulos).
 4. **Dados** reais da Receita (BrasilAPI) com resiliência de produção.
-5. **Iteração por intenção** (v1 → v2 do scoring, 25 commits).
+5. **Iteração por intenção** (v1 → v2 do scoring, 100+ commits).
 6. **Revisão crítica** que caçou bugs silenciosos e blindou segurança/privacidade.
 7. **Demonstrar & decidir** → 4 abas, inteligência agregada, plano de ação, servidor MCP **e assistente MCP local com LLM**.
 
@@ -368,6 +368,6 @@ Valor entregue
 ## Apêndice C — Fonte dos números (rastreabilidade)
 
 - Linhas de código: `wc -l` sobre os arquivos versionados (exclui `node_modules`).
-- Commits e datas: histórico `git log` (**68 commits**, 10–19/jun/2026).
+- Commits e datas: histórico `git log` (10–19/jun/2026). **≈110 commits no total** considerando todas as branches de desenvolvimento (68 na branch `main` publicada + a branch `feature/mcp-chat` do assistente).
 - Funções, módulos, gráficos, ferramentas MCP, CNAEs: contagem direta no código-fonte (`utils.js`, `api.js`, `insights.js`, `dashboard.js`, `app.js`, `chat.js`, `mcp-server/index.js`, `mcp-bridge/server.js`).
 - Tempo tradicional: **estimativa** por frente de trabalho (não medição) — apresentar como ordem de grandeza, não como número exato.
