@@ -20,6 +20,20 @@ A evolução é estruturada em 8 etapas consecutivas:
 
 ---
 
+## 💡 Highlights de Momentos Chave no Desenvolvimento
+
+Analisando a evolução dos commits, identificamos momentos técnicos e estratégicos cruciais que definiram o rumo do projeto:
+
+*   **Virada Analítica com Motor de Scoring (Commit `766e5b0`)**: O projeto deixou de ser um simples validador e visualizador de dados para se tornar um motor de inteligência de vendas. A introdução de scores de oportunidade (vendas) e higiene cadastral agregou valor de negócio imediato ao classificar inativos por potencial de retorno.
+*   **Modularização por Abas e Chart.js (Commits `b37bdc9` e `210ac2a`)**: A quebra da UI monolítica em abas dedicadas e a inserção de gráficos ricos permitiram a consolidação de informações em um layout executivo, facilitando a tomada de decisão gerencial.
+*   **Garantia de Qualidade com Testes Isolados (Commit `6819724`)**: A criação do `run_local.js` com testes unitários rodados via módulo `vm` do Node.js garantiu que o motor analítico pudesse evoluir sem quebras lógicas na validação e priorização de dados.
+*   **Expansibilidade com o Protocolo MCP (Commit `3171906`)**: Ao expor as funcionalidades da plataforma como ferramentas MCP, o AuditBase abriu suas portas para a era das IAs agenticas, permitindo que LLMs auditem CNPJs por comandos em linguagem natural.
+*   **Arquitetura de Dados de Larga Escala (Commit `913dbf4`)**: O gargalo de memória de 5MB do `localStorage` foi superado com a migração completa do armazenamento de sessão para `IndexedDB`, permitindo que o navegador armazene bases massivas com 5.000+ clientes com total resiliência a atualizações de página.
+*   **Preparação para o Futuro Nacional (Commit `78a0f3d`)**: A implementação da lógica para suportar a transição do Governo Federal para CNPJs Alfanuméricos (previsto para Julho/2026) tornou a ferramenta resiliente a mudanças regulatórias futuras.
+*   **Design de Console MCP Inspector (Commits `ccfc3b4` e `cc85fd5`)**: A concepção visual no Stitch e o isolamento do assistente MCP em uma nova aba com splitters dinâmicos e logs streaming em tempo real elevaram a experiência do usuário para um console hacker de alta fidelidade, interativo e redimensionável.
+
+---
+
 ### Etapa 1: Gênese e MVP Inicial (Prototipagem)
 
 A fundação do projeto começou com foco em funcionalidade bruta, buscando viabilizar a ideia rapidamente.
