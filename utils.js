@@ -843,6 +843,125 @@ const Utils = (function () {
   }
 
   // ═══════════════════════════════════════════════
+  // Reconstrução a partir do XLSX exportado (round-trip Excel)
+  // ═══════════════════════════════════════════════
+
+  /** "R$ 1.234,56" | "1234.56" | 1234 → Number (0 se vazio/ilegível). */
+  function parseBRNumber(value) {
+    if (typeof value === 'number') return isFinite(value) ? value : 0;
+    let s = String(value ?? '').replace(/[^\d,.-]/g, '').trim();
+    if (!s) return 0;
+    if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.'); // pt-BR
+    else if (s.includes(',')) s = s.replace(',', '.');
+    const n = parseFloat(s);
+    return isFinite(n) ? n : 0;
+  }
+
+  /** "Sim"/"Não"/"N/D" → true/false/null. */
+  function parseSimNao(value) {
+    const s = String(value ?? '').trim().toUpperCase();
+    if (s === 'SIM') return true;
+    if (s === 'NÃO' || s === 'NAO') return false;
+    return null;
+  }
+
+  /** "NOME (QUALIFICAÇÃO); NOME2 (QUAL2)" → [{nome_socio, qualificacao_socio}]. */
+  function parseQsaString(value) {
+    const s = String(value ?? '').trim();
+    if (!s) return [];
+    return s
+      .split(';')
+      .map((part) => {
+        const m = part.trim().match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+        return m
+          ? { nome_socio: m[1].trim(), qualificacao_socio: m[2].trim() }
+          : { nome_socio: part.trim(), qualificacao_socio: '' };
+      })
+      .filter((x) => x.nome_socio);
+  }
+
+  /** "1234 - desc; 5678 - desc2" → [{codigo, descricao}]. */
+  function parseCnaesString(value) {
+    const s = String(value ?? '').trim();
+    if (!s) return [];
+    return s
+      .split(';')
+      .map((part) => {
+        const idx = part.indexOf(' - ');
+        return idx >= 0
+          ? { codigo: part.slice(0, idx).trim(), descricao: part.slice(idx + 3).trim() }
+          : { codigo: part.trim(), descricao: '' };
+      })
+      .filter((c) => c.codigo);
+  }
+
+  /**
+   * Reconstrói `{ client, official, status, error }` a partir de uma linha da
+   * aba "Carteira" do XLSX exportado (objeto cujas chaves são os cabeçalhos
+   * exportados). As métricas derivadas (scores, divergências, ação) NÃO são
+   * lidas da planilha — devem ser recalculadas pelo chamador via
+   * {@link generateAuditResult}(client, official), garantindo consistência
+   * mesmo quando o usuário edita dados diretamente no Excel.
+   *
+   * @param {Object} row
+   * @returns {{client:Object, official:(Object|null), status:string, error:string}}
+   */
+  function parseCarteiraRow(row) {
+    const get = (k) => (row && row[k] != null ? String(row[k]).trim() : '');
+
+    let cnpj = cleanCNPJ(get('CNPJ'));
+    if (cnpj.length > 0 && cnpj.length < 14) cnpj = cnpj.padStart(14, '0');
+
+    const client = {
+      cnpj,
+      razao_social: get('Razão Social (Interno)'),
+      nome_fantasia: get('Nome Fantasia (Interno)'),
+      cep: get('CEP (Interno)'),
+      logradouro: get('Endereço (Interno)'),
+      municipio: get('Município (Interno)'),
+      uf: get('UF (Interno)'),
+      cnae: get('CNAE (Interno)'),
+      vendedor: get('Vendedor Responsável'),
+      codigo: get('Código Cliente'),
+      ultcpr: get('Última Compra (ultcpr)'),
+      datmaicpr: get('Data Maior Compra (datmaicpr)'),
+    };
+
+    const situacao = get('Situação Cadastral (RFB)');
+    const razaoRfb = get('Razão Social (Receita Federal)');
+    const temRfb = !!(situacao || razaoRfb);
+
+    const official = temRfb
+      ? {
+          razao_social: razaoRfb,
+          nome_fantasia: get('Nome Fantasia (Receita Federal)'),
+          descricao_situacao_cadastral: situacao,
+          data_situacao_cadastral: get('Data Situação Cadastral'),
+          descricao_motivo_situacao_cadastral: get('Motivo Situação Cadastral'),
+          capital_social: parseBRNumber(get('Capital Social')),
+          data_inicio_atividade: get('Data Abertura'),
+          porte: get('Porte (RFB)'),
+          cnae_fiscal: get('CNAE Principal Código'),
+          cnae_fiscal_descricao: get('CNAE Principal Descrição'),
+          opcao_pelo_simples: parseSimNao(get('Simples Nacional')),
+          opcao_pelo_mei: parseSimNao(get('MEI')),
+          cep: get('CEP (RFB)'),
+          logradouro: get('Endereço (RFB)'),
+          bairro: get('Bairro (RFB)'),
+          municipio: get('Município (RFB)'),
+          uf: get('UF (RFB)'),
+          ddd_telefone_1: get('Telefone 1'),
+          ddd_telefone_2: get('Telefone 2'),
+          email: get('E-mail'),
+          qsa: parseQsaString(get('Quadro Societário (QSA)')),
+          cnaes_secundarios: parseCnaesString(get('CNAEs Secundários')),
+        }
+      : null;
+
+    return { client, official, status: get('Status Processamento'), error: get('Erro de API') };
+  }
+
+  // ═══════════════════════════════════════════════
   // Exportações (CSV / XLSX / JSON)
   // ═══════════════════════════════════════════════
 
@@ -1187,6 +1306,7 @@ const Utils = (function () {
         "Data Situação Cadastral": rec.data_situacao_cadastral || '',
         "Motivo Situação Cadastral": rec.descricao_motivo_situacao_cadastral || '',
         "Capital Social": rec.capital_social || '',
+        "Porte (RFB)": rec.porte || '',
         "Data Abertura": rec.data_inicio_atividade || '',
         "CNAE Principal Código": rec.cnae_fiscal || '',
         "CNAE Principal Descrição": rec.cnae_fiscal_descricao || '',
@@ -1547,6 +1667,12 @@ const Utils = (function () {
     determinePriority,
     determineAction,
     generateAuditResult,
+    // Reconstrução (round-trip Excel)
+    parseCarteiraRow,
+    parseBRNumber,
+    parseSimNao,
+    parseQsaString,
+    parseCnaesString,
     // Export
     exportToCSV,
     downloadCSV,

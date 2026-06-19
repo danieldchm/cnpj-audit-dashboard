@@ -1434,97 +1434,77 @@ const App = (function () {
         try {
           const data = new Uint8Array(event.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
-          if (rows.length < 2) {
-            showToast('Arquivo Excel vazio ou sem dados.', 'error');
+          // Lê a aba "Carteira" (uma linha por cliente) gerada pelo export.
+          // Cai para a 1ª aba caso o arquivo não tenha "Carteira".
+          const sheetName = workbook.SheetNames.includes('Carteira')
+            ? 'Carteira'
+            : workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
+
+          if (!rows.length || !Object.prototype.hasOwnProperty.call(rows[0], 'CNPJ')) {
+            showToast('Excel inválido: aba "Carteira" com coluna "CNPJ" não encontrada. Use um arquivo exportado pelo AuditBase.', 'error');
             return;
           }
-          
-          const headers = rows[0];
-          
-          clients = [];
-          results = [];
-          
-          for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            if (!row || row.length === 0) continue;
-            
-            const getVal = (colName) => {
-              const idx = headers.indexOf(colName);
-              return idx >= 0 ? row[idx] || '' : '';
-            };
-            
-            const cnpj = getVal('CNPJ');
-            if (!cnpj) continue;
-            
-            const client = {
-              cgcCpf: cnpj,
-              razao: getVal('Interno_Razao_Social'),
-              vendedor: getVal('Vendedor_Responsavel'),
-              cidade: getVal('Interno_Município'),
-              estado: getVal('Interno_UF'),
-            };
-            
-            const statusGeral = getVal('Status_Geral');
-            let isDivergent = false;
-            if (statusGeral === 'divergence') isDivergent = true;
-            
-            const result = {
-              status: statusGeral === 'error' ? 'error' : 'success',
-              isDivergent: isDivergent,
-              auditResult: {
-                cnpj: cnpj,
-                status_geral: statusGeral,
-                status_receita: getVal('Status_Receita'),
-                prioridade: getVal('Prioridade_Contato'),
-                score: parseInt(getVal('Score_Reativacao'), 10) || 0,
-                vendedor_responsavel: getVal('Vendedor_Responsavel'),
-                recomendacao: getVal('Recomendacao'),
-                divergences: getVal('Divergencias') ? getVal('Divergencias').split(', ') : [],
-                internalData: {
-                  razao_social: getVal('Interno_Razao_Social'),
-                  nome_fantasia: getVal('Interno_Nome_Fantasia'),
-                  cep: getVal('Interno_CEP'),
-                  logradouro: getVal('Interno_Endereço'),
-                  municipio: getVal('Interno_Município'),
-                  uf: getVal('Interno_UF'),
-                  cnae: getVal('Interno_CNAE')
-                },
-                officialData: {
-                  razao_social: getVal('Receita_Razao_Social'),
-                  nome_fantasia: getVal('Receita_Nome_Fantasia'),
-                  cep: getVal('Receita_CEP'),
-                  logradouro: getVal('Receita_Endereço'),
-                  municipio: getVal('Receita_Município'),
-                  uf: getVal('Receita_UF'),
-                  cnae_fiscal_descricao: getVal('Receita_CNAE')
-                },
-                observacoes: getVal('Observacoes')
-              }
-            };
-            
-            clients.push(client);
-            results.push(result);
+
+          const newClients = [];
+          const newResults = [];
+
+          for (const row of rows) {
+            const { client, official, status: statusCol, error: errorCol } = Utils.parseCarteiraRow(row);
+            if (!client.cnpj) continue;
+            newClients.push(client);
+
+            if (official) {
+              // Recalcula scores/divergências/ação pelo engine — consistente e
+              // reflete edições feitas direto no Excel.
+              const audit = Utils.generateAuditResult(client, official);
+              audit.inteligencia_web = API.generateWebIntelligence(official);
+              const hasDivergence = audit.divergencias && audit.divergencias.length > 0;
+              const isInactive = audit.status_receita !== 'ATIVA' && audit.status_receita !== 'ERRO';
+              let status = 'success';
+              if (isInactive) status = 'inactive';
+              else if (hasDivergence) status = 'divergence';
+              newResults.push({ status, priority: audit.prioridade_geral, auditResult: audit, error: null });
+            } else {
+              // Linha sem dados da Receita (não encontrado / erro / pendente).
+              const st = ['error', 'inactive', 'pending'].includes(statusCol) ? statusCol : 'pending';
+              newResults.push({ status: st, priority: null, auditResult: null, error: errorCol || null });
+            }
           }
-          
+
+          if (newClients.length === 0) {
+            showToast('Nenhum registro válido encontrado na aba "Carteira".', 'error');
+            return;
+          }
+
+          clients = newClients;
+          results = newResults;
+
+          // Filtro de vendedores
+          const vendedoresImp = [...new Set(clients.map(c => c.vendedor).filter(Boolean))].sort();
+          dom.filterVendedor.innerHTML = '<option value="">Todos os Vendedores</option>' +
+            vendedoresImp.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+
           dom.uploadArea.style.display = 'none';
           dom.fileInfo.classList.remove('hidden');
           dom.fileName.textContent = file.name;
           dom.fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
-          
+
           currentPage = 1;
           updateMetrics();
           applyFilters();
-          
-          dom.btnProcess.disabled = true;
+          renderDashboard();
+
+          const isDone = results.every(r => r.status !== 'pending');
+          dom.btnProcess.disabled = isDone;
+          dom.btnProcessText.textContent = isDone ? 'Processamento Concluído' : 'Retomar Processamento';
           dom.btnExport.disabled = false;
-          
-          showToast(`Arquivo Excel importado com ${clients.length} registros!`, 'success');
+          dom.btnRetry.classList.toggle('hidden', !results.some(r => r.status === 'error'));
+
+          showToast(`Excel importado: ${clients.length} registro(s) reconstruído(s).`, 'success');
           saveSession();
-          
+
         } catch (err) {
           console.error(err);
           showToast('Erro ao processar arquivo XLSX.', 'error');

@@ -240,6 +240,71 @@ assert(ins.cohorts['Ativos (< 6 meses)'] === 1, 'cohort recência: 1 ativo < 6 m
 assert(ins.cohorts['1-2 anos'] === 1, 'cohort recência: 1 entre 1-2 anos (400 dias)');
 
 // ═══════════════════════════════════════════════════════════
+// 9b. Round-trip Excel (parseCarteiraRow + reconstrução)
+// ═══════════════════════════════════════════════════════════
+section('Round-trip XLSX (parseCarteiraRow)');
+assert(Utils.parseBRNumber('R$ 1.234,56') === 1234.56, 'parseBRNumber pt-BR (R$ 1.234,56)');
+assert(Utils.parseBRNumber('50000') === 50000, 'parseBRNumber inteiro');
+assert(Utils.parseBRNumber('') === 0, 'parseBRNumber vazio → 0');
+assert(
+  Utils.parseSimNao('Sim') === true && Utils.parseSimNao('Não') === false && Utils.parseSimNao('N/D') === null,
+  'parseSimNao Sim/Não/N/D'
+);
+const qsaP = Utils.parseQsaString('JOAO SILVA (Sócio-Administrador); MARIA (Sócia)');
+assert(qsaP.length === 2 && qsaP[0].nome_socio === 'JOAO SILVA' && qsaP[0].qualificacao_socio === 'Sócio-Administrador', 'parseQsaString');
+const cnaeP = Utils.parseCnaesString('4761003 - Papelaria; 4789099 - Outros');
+assert(cnaeP.length === 2 && cnaeP[0].codigo === '4761003' && cnaeP[0].descricao === 'Papelaria', 'parseCnaesString');
+
+// Fidelidade: (client, official) → audit1; serializa para linha "Carteira";
+// reimporta com parseCarteiraRow; recalcula → mesmos números do original.
+const rtClient = {
+  cnpj: '33000167000101', razao_social: 'PETROLEO BR', vendedor: 'VEN_01', codigo: 'C1',
+  ultcpr: ultcprRecente, cep: '', logradouro: '', municipio: '', uf: '', cnae: '4761003',
+  nome_fantasia: '', datmaicpr: '',
+};
+const rtOfficial = {
+  razao_social: 'PETROLEO BR', nome_fantasia: 'PETRO', descricao_situacao_cadastral: 'ATIVA',
+  data_situacao_cadastral: '01/01/2010', capital_social: 50000, data_inicio_atividade: '01/01/2010',
+  porte: 'MICRO EMPRESA', cnae_fiscal: '4761003', cnae_fiscal_descricao: 'Comércio varejista de artigos de papelaria',
+  opcao_pelo_simples: true, opcao_pelo_mei: false, cep: '01001000', logradouro: 'Rua X',
+  bairro: 'Centro', municipio: 'São Paulo', uf: 'SP', ddd_telefone_1: '(11) 1111-1111', email: 'x@x.com',
+  qsa: [{ nome_socio: 'JOAO SILVA', qualificacao_socio: 'Sócio-Administrador' }],
+  cnaes_secundarios: [{ codigo: '4789099', descricao: 'Outros' }],
+};
+const audit1 = Utils.generateAuditResult(rtClient, rtOfficial);
+const fmtBool = (v) => (v === true ? 'Sim' : v === false ? 'Não' : 'N/D');
+const exportedRow = {
+  'CNPJ': Utils.formatCNPJ(rtClient.cnpj),
+  'Razão Social (Interno)': rtClient.razao_social,
+  'Vendedor Responsável': rtClient.vendedor,
+  'Código Cliente': rtClient.codigo,
+  'Última Compra (ultcpr)': rtClient.ultcpr,
+  'CNAE (Interno)': rtClient.cnae,
+  'Razão Social (Receita Federal)': rtOfficial.razao_social,
+  'Situação Cadastral (RFB)': rtOfficial.descricao_situacao_cadastral,
+  'Capital Social': rtOfficial.capital_social,
+  'Porte (RFB)': rtOfficial.porte,
+  'Data Abertura': rtOfficial.data_inicio_atividade,
+  'Data Situação Cadastral': rtOfficial.data_situacao_cadastral,
+  'CNAE Principal Código': rtOfficial.cnae_fiscal,
+  'CNAE Principal Descrição': rtOfficial.cnae_fiscal_descricao,
+  'Simples Nacional': fmtBool(rtOfficial.opcao_pelo_simples),
+  'MEI': fmtBool(rtOfficial.opcao_pelo_mei),
+  'Telefone 1': rtOfficial.ddd_telefone_1,
+  'E-mail': rtOfficial.email,
+  'Quadro Societário (QSA)': 'JOAO SILVA (Sócio-Administrador)',
+  'CNAEs Secundários': '4789099 - Outros',
+  'Status Processamento': 'success',
+};
+const rt = Utils.parseCarteiraRow(exportedRow);
+const audit2 = Utils.generateAuditResult(rt.client, rt.official);
+assert(rt.client.cnpj === '33000167000101', 'round-trip: CNPJ recuperado');
+assert(rt.official.qsa.length === 1 && rt.official.capital_social === 50000, 'round-trip: QSA e capital reconstruídos');
+assert(audit2.score_breakdown.porteDetectado === 'ME', 'round-trip: porte recuperado (Porte RFB) → ME');
+assert(audit2.score_oportunidade === audit1.score_oportunidade, 'round-trip: score de oportunidade idêntico ao original');
+assert(audit2.prioridade_geral === audit1.prioridade_geral, 'round-trip: prioridade idêntica ao original');
+
+// ═══════════════════════════════════════════════════════════
 // 10. API — mapeamento de erros (assíncrono)
 // ═══════════════════════════════════════════════════════════
 (async () => {
