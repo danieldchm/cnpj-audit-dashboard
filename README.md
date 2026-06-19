@@ -28,6 +28,8 @@ cnpj-audit-dashboard/
 ├── insights.js                   # Motor de inferências agregadas e QSA
 ├── dashboard.js                  # Renderização de abas, painéis e gráficos (Chart.js)
 ├── api.js                        # Integração com a BrasilAPI e lotes de workers
+├── chat.html                     # Interface dedicada do Assistente MCP
+├── chat.js                       # Lógica de interação do chat e status MCP
 ├── run_local.js                  # Suite de testes unitários locais
 ├── docs/                         # Documentos de design, apresentação e relatórios
 │   ├── apresentacao_tecnica.md   # Conteúdo técnico da apresentação (MBA)
@@ -37,6 +39,7 @@ cnpj-audit-dashboard/
 ├── dados/                        # Datasets de entrada e resultados
 │   ├── amostra_clientes.csv      # Base teste de exemplo para importação
 │   └── resultados/               # Resultados gerados (CSV, JSON, KPI)
+├── mcp-bridge/                   # Ponte de integração local (Ollama <-> MCP Client)
 ├── mcp-server/                   # Servidor Model Context Protocol nativo
 └── README.md                     # Este arquivo
 ```
@@ -61,9 +64,12 @@ O projeto conta com um Motor de Scoring V2 avançado, separando **Score de Venda
 - **Contato Imediato** → Extração de telefones com discador dinâmico e e-mails rápidos para facilitar o outreach.
 - **Visibilidade de Cross-Sell** → Avaliação de afinidade de CNAEs (primários e secundários) para recomendar oportunidades de novos negócios.
 
-## 🤖 Integração IA: Servidor MCP (Model Context Protocol)
+## 🤖 Integração IA: Servidor & Assistente MCP (Model Context Protocol)
 
-O projeto inclui um **Servidor MCP nativo** localizado na pasta `mcp-server/`. Este servidor expõe toda a lógica de negócio pesada (validações matemáticas de CNPJ e o pipeline do `generateAuditResult`) para IAs agenticas (como o Claude Desktop). 
+O projeto possui integração completa com o ecossistema **Model Context Protocol (MCP)**, atuando tanto como servidor de ferramentas para IAs externas quanto contendo um assistente de chat local e dinâmico.
+
+### 1. Servidor MCP Nativo (`mcp-server/`)
+Expõe toda a lógica pesada de negócio (validações matemáticas de CNPJ e a pipeline completa do `generateAuditResult`) para IAs agenticas externas (como o Claude Desktop).
 
 **Como configurar no Claude Desktop:**
 ```json
@@ -78,6 +84,12 @@ O projeto inclui um **Servidor MCP nativo** localizado na pasta `mcp-server/`. E
   }
 }
 ```
+
+### 2. Assistente MCP Local Integrado (`chat.html` & `mcp-bridge/`)
+Criamos uma aba standalone e interativa para chat com IA. Ela se comunica com o **Ollama local** rodando o modelo `qwen2.5-coder:7b` e utiliza o protocolo MCP via uma ponte local (`mcp-bridge/`) para buscar dados do AuditBase em tempo real.
+- **Storytelling Acadêmico:** O assistente descreve seu raciocínio, exibindo uma caixa roxa destacada com as chamadas de ferramentas MCP realizadas durante a conversa.
+- **Diagnóstico em Tempo Real:** Possui badges no topo do chat monitorando a integridade da ponte Express, do Ollama e da conexão stdio com o MCP Server.
+- **Responsividade Total:** Adaptado e colapsável para dispositivos móveis.
 
 ## 🗺️ Roadmap: Evolução em Direção a CRM
 
@@ -108,12 +120,32 @@ Embora o **AuditBase** não tenha o objetivo de se tornar um CRM completo de mer
 
 ## ▶️ Como Executar
 
-### Interface Gráfica (Dashboard Web)
+### Opção 1: Execução Completa da Stack Local (Recomendado)
+Para rodar a interface web, a ponte do assistente, a execução local do Ollama e o MCP server simultaneamente:
+
+1. **Pré-requisitos:** Certifique-se de ter o [Ollama](https://ollama.com/) instalado na máquina.
+2. **Modelo:** Baixe o modelo recomendado executando:
+   ```bash
+   ollama pull qwen2.5-coder:7b
+   ```
+3. **Instalação:** Instale as dependências npm na raiz:
+   ```bash
+   npm install
+   ```
+4. **Execução:** Rode a stack inteira com o comando:
+   ```bash
+   npm start
+   ```
+   * Acesse o Dashboard em: `http://localhost:8000`
+   * Acesse o Assistente MCP em: `http://localhost:8000/chat.html` (ou clique em **Assistente MCP** no cabeçalho do Dashboard)
+
+### Opção 2: Apenas o Dashboard Web Estático (Hospedagem Simples)
+Caso queira apenas auditar CNPJs via API pública da BrasilAPI diretamente na interface estática:
 ```bash
-# Opção 1: Python
+# Opção A: Python
 python3 -m http.server 8080
 
-# Opção 2: Node.js
+# Opção B: Node.js
 npx serve .
 
 # Acesse: http://localhost:8080
