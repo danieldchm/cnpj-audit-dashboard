@@ -74,7 +74,23 @@ const Dashboard = (function () {
     if (!window.Chart) return;
     const el = $(id);
     if (!el) return;
-    if (_charts[id]) _charts[id].destroy();
+
+    const existing = _charts[id];
+    if (existing) {
+      // Atualiza NO LUGAR em vez de destruir/recriar. Durante a análise o
+      // dashboard re-renderiza a cada tick de progresso; recriar o gráfico
+      // reproduzia a animação de entrada toda vez ("refresh incessante").
+      // update('none') aplica os novos dados sem animar e sem piscar.
+      existing.data.labels = config.data.labels;
+      const ds = existing.data.datasets[0];
+      const newDs = config.data.datasets[0];
+      ds.data = newDs.data;
+      if (newDs.backgroundColor !== undefined) ds.backgroundColor = newDs.backgroundColor;
+      existing.update('none');
+      return;
+    }
+
+    // Primeira renderização deste gráfico: cria com a animação de entrada.
     _charts[id] = new Chart(el.getContext('2d'), config);
   }
 
