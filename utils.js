@@ -212,23 +212,24 @@ const Utils = (function () {
     if (value == null || value === '') return null;
     if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
 
-    // Número serial do Excel (planilhas exportadas com célula numérica)
-    if (typeof value === 'number' && isFinite(value) && value > 20000 && value < 80000) {
+    // Número serial do Excel (aceita número real ou string numérica)
+    const numVal = Number(value);
+    if (!isNaN(numVal) && isFinite(numVal) && numVal > 20000 && numVal < 80000) {
       const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-      return new Date(excelEpoch.getTime() + value * 86400000);
+      return new Date(excelEpoch.getTime() + numVal * 86400000);
     }
 
     const str = String(value).trim();
 
-    // ISO: aaaa-mm-dd ou aaaa/mm/dd (com hora opcional)
-    let m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    // ISO: aaaa-mm-dd ou aaaa/mm/dd ou aaaa.mm.dd
+    let m = str.match(/^(\d{4})[-/. ](\d{1,2})[-/. ](\d{1,2})/);
     if (m) {
       const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
       return isNaN(d.getTime()) ? null : d;
     }
 
-    // Brasileiro: dd/mm/aaaa ou dd-mm-aaaa (aceita aa de 2 dígitos)
-    m = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/);
+    // Brasileiro: dd/mm/aaaa, dd-mm-aaaa, dd.mm.aa (aceita aa de 2 dígitos)
+    m = str.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2,4})/);
     if (m) {
       let year = Number(m[3]);
       if (year < 100) year += year >= 70 ? 1900 : 2000;
@@ -1049,53 +1050,309 @@ const Utils = (function () {
    * @param {Array<Object>} results
    * @param {string} [filename]
    */
-  function exportToXLSX(results, filename = 'auditoria_cnpj.xlsx') {
+  function exportToXLSX(clients, results, filename = 'auditoria_cnpj.xlsx') {
     if (!window.XLSX) {
       console.error('SheetJS (XLSX) não está carregado.');
       return;
     }
-    if (!Array.isArray(results) || results.length === 0) {
+    if (!Array.isArray(clients) || clients.length === 0) {
       console.warn('exportToXLSX: nada para exportar.');
       return;
     }
 
-    const flatData = results.map((r) => {
-      const rec = r.dados_completos_receita || {};
-      const bd = r.score_breakdown || {};
+    const ins = window.Insights ? window.Insights.computeInsights(results) : null;
+    const workbook = XLSX.utils.book_new();
+
+    // ─────────────────────────────────────────────────────────
+    // 1. ABA: VISÃO GERAL
+    // ─────────────────────────────────────────────────────────
+    const wsOverview = XLSX.utils.aoa_to_sheet([["DASHBOARD ANALÍTICO — VISÃO GERAL"]]);
+    let overviewRow = 3;
+
+    function addTableToSheet(ws, title, headers, rows, startRow) {
+      XLSX.utils.sheet_add_aoa(ws, [[title]], { origin: `A${startRow}` });
+      XLSX.utils.sheet_add_aoa(ws, [headers], { origin: `A${startRow + 1}` });
+      XLSX.utils.sheet_add_aoa(ws, rows, { origin: `A${startRow + 2}` });
+      return startRow + 2 + rows.length + 2; // return next start row with 2 empty rows gap
+    }
+
+    if (ins) {
+      // KPIs Gerais
+      const kpis = [
+        ["Total de Clientes na Base", ins.totalValidos],
+        ["Receita Potencial (Carteira Ativa Priorizada)", ins.capital.potencialAtivo],
+        ["Receita Quente (Prioridade Alta)", ins.capital.quenteAlto],
+        ["Capital em Risco (CNPJs Inativos)", ins.capital.emRiscoInativo],
+        ["Grupos Societários / Econômicos", ins.socios.totalGrupos],
+        ["Prováveis Reaberturas", ins.socios.reabertas.length],
+        ["Sinais Comerciais / Oportunidades Dormentes", ins.anomalias.dormentes.length]
+      ];
+      overviewRow = addTableToSheet(wsOverview, "KPIs da Carteira", ["Métrica", "Valor"], kpis, overviewRow);
+
+      // Distribuição por Situação Cadastral
+      const sit = ins.distributions.situacao.map(d => [d.label, d.value]);
+      overviewRow = addTableToSheet(wsOverview, "Distribuição por Situação Cadastral (RFB)", ["Situação", "Quantidade"], sit, overviewRow);
+
+      // Distribuição por Prioridade Comercial
+      const prio = ins.distributions.prioridade.map(d => [d.label, d.value]);
+      overviewRow = addTableToSheet(wsOverview, "Distribuição por Prioridade de Abordagem", ["Prioridade", "Quantidade"], prio, overviewRow);
+
+      // Distribuição por Regime Tributário
+      const reg = ins.distributions.regime.map(d => [d.label, d.value]);
+      overviewRow = addTableToSheet(wsOverview, "Distribuição por Regime Tributário", ["Regime", "Quantidade"], reg, overviewRow);
+
+      // Cohorts de Inatividade
+      const coh = Object.entries(ins.cohorts).map(([k, v]) => [k, v]);
+      overviewRow = addTableToSheet(wsOverview, "Cohorts de Inatividade Comercial", ["Faixa de Tempo Sem Compra", "Clientes"], coh, overviewRow);
+
+      // Distribuição por Porte
+      const port = ins.distributions.porte.map(d => [d.label, d.value]);
+      overviewRow = addTableToSheet(wsOverview, "Distribuição por Porte de Empresa", ["Porte", "Quantidade"], port, overviewRow);
+
+      // Distribuição Geográfica (UF)
+      const ufs = ins.geografia.uf.map(d => [d.label, d.value]);
+      overviewRow = addTableToSheet(wsOverview, "Distribuição Geográfica (UF)", ["UF", "Quantidade"], ufs, overviewRow);
+    } else {
+      XLSX.utils.sheet_add_aoa(wsOverview, [["Sem dados analíticos de insights disponíveis"]], { origin: "A3" });
+    }
+    XLSX.utils.book_append_sheet(workbook, wsOverview, "Visão Geral");
+
+    // ─────────────────────────────────────────────────────────
+    // 2. ABA: CARTEIRA
+    // ─────────────────────────────────────────────────────────
+    const flatPortfolio = clients.map((c, idx) => {
+      const res = results[idx] || null;
+      const a = res?.auditResult || null;
+      const rec = a?.dados_completos_receita || {};
+      const bd = a?.score_breakdown || {};
+      const web = a?.inteligencia_web || {};
+
+      const fmtBool = (val) => {
+        if (val === true) return 'Sim';
+        if (val === false) return 'Não';
+        return 'N/D';
+      };
+
+      const qsaList = Array.isArray(rec.qsa)
+        ? rec.qsa.map(s => `${s.nome_socio || s.nome || ''} (${s.qualificacao_socio || ''})`).join('; ')
+        : '';
+
+      const cnaesSec = Array.isArray(rec.cnaes_secundarios)
+        ? rec.cnaes_secundarios.map(s => `${s.codigo} - ${s.descricao}`).join('; ')
+        : '';
+
       return {
-        CNPJ: r.cnpj_analisado ?? '',
-        Vendedor: r.vendedor ?? '',
-        Codigo_Cliente: r.codigo_cliente ?? '',
-        Classificacao: r.classificacao ?? '',
-        Prioridade: r.prioridade_geral ?? '',
-        Score_Oportunidade: r.score_oportunidade ?? r.score_vpa ?? '',
-        Score_Higiene: r.score_higiene ?? '',
-        Dias_Inativos: bd.diasInativos ?? '',
-        Porte: bd.porteDetectado ?? rec.porte ?? '',
-        Afinidade_CNAE: bd.scoreAfinidade ?? '',
-        Status_Receita: r.status_receita ?? '',
-        Acao_Recomendada: r.acao_recomendada ?? '',
-        Acao_Administrativa: r.acao_administrativa ?? '',
-        Divergencias: Array.isArray(r.divergencias)
-          ? r.divergencias.map((d) => d.campo_com_divergencia).join(', ')
+        "CNPJ": c.cnpj || a?.cnpj_analisado || '',
+        "Razão Social (Interno)": c.razao_social || '',
+        "Nome Fantasia (Interno)": c.nome_fantasia || '',
+        "Razão Social (Receita Federal)": rec.razao_social || '',
+        "Nome Fantasia (Receita Federal)": rec.nome_fantasia || '',
+        "Vendedor Responsável": c.vendedor || a?.vendedor || '',
+        "Código Cliente": c.codigo || '',
+        "Última Compra (ultcpr)": c.ultcpr || '',
+        "Data Maior Compra (datmaicpr)": c.datmaicpr || '',
+        "CEP (Interno)": c.cep || '',
+        "Endereço (Interno)": c.logradouro || '',
+        "Município (Interno)": c.municipio || '',
+        "UF (Interno)": c.uf || '',
+        "CNAE (Interno)": c.cnae || '',
+        "Status Processamento": res?.status || 'pending',
+        "Erro de API": res?.error || '',
+        "Prioridade de Contato": res?.priority || '',
+        "Score Oportunidade": a?.score_oportunidade ?? a?.score_vpa ?? '',
+        "Score Higiene": a?.score_higiene ?? '',
+        "Ação Recomendada": a?.acao_recomendada || '',
+        "Ação Administrativa": a?.acao_administrativa || '',
+        "Divergências Cadastrais": Array.isArray(a?.divergencias)
+          ? a.divergencias.map(d => `${d.campo_com_divergencia} (Interno: ${d.valor_interno} / Oficial: ${d.valor_oficial})`).join(', ')
           : '',
-        Flags: Array.isArray(r.score_flags) ? r.score_flags.join(', ') : '',
-        Razao_Social: rec.razao_social ?? '',
-        Nome_Fantasia: rec.nome_fantasia ?? '',
-        Municipio: rec.municipio ?? '',
-        UF: rec.uf ?? '',
-        Telefone: rec.ddd_telefone_1 ?? '',
-        Email: rec.email ?? '',
-        CNAE_Principal: rec.cnae_fiscal_descricao ?? '',
-        Capital_Social: rec.capital_social ?? '',
-        Data_Inicio_Atividade: rec.data_inicio_atividade ?? '',
-        Data_Consulta: r.data_consulta ?? '',
+        "Situação Cadastral (RFB)": rec.descricao_situacao_cadastral || '',
+        "Data Situação Cadastral": rec.data_situacao_cadastral || '',
+        "Motivo Situação Cadastral": rec.descricao_motivo_situacao_cadastral || '',
+        "Capital Social": rec.capital_social || '',
+        "Data Abertura": rec.data_inicio_atividade || '',
+        "CNAE Principal Código": rec.cnae_fiscal || '',
+        "CNAE Principal Descrição": rec.cnae_fiscal_descricao || '',
+        "Simples Nacional": fmtBool(rec.opcao_pelo_simples),
+        "MEI": fmtBool(rec.opcao_pelo_mei),
+        "CEP (RFB)": rec.cep || '',
+        "Endereço (RFB)": [rec.logradouro, rec.numero].filter(Boolean).join(', '),
+        "Bairro (RFB)": rec.bairro || '',
+        "Município (RFB)": rec.municipio || '',
+        "UF (RFB)": rec.uf || '',
+        "Telefone 1": rec.ddd_telefone_1 || '',
+        "Telefone 2": rec.ddd_telefone_2 || '',
+        "E-mail": rec.email || '',
+        "Quadro Societário (QSA)": qsaList,
+        "CNAEs Secundários": cnaesSec,
+        "Indícios de Atividade (Web)": fmtBool(web.indicios_de_operacao_ativa),
+        "Link Principal Inteligência Web": web.link_principal_encontrado || '',
+        "Resumo Inteligência Web": web.resumo_da_atuacao || ''
       };
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(flatData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Resultados_Auditoria');
+    const wsPortfolio = XLSX.utils.json_to_sheet(flatPortfolio);
+    XLSX.utils.book_append_sheet(workbook, wsPortfolio, "Carteira");
+
+    // ─────────────────────────────────────────────────────────
+    // 3. ABA: INTELIGÊNCIA
+    // ─────────────────────────────────────────────────────────
+    const wsIntel = XLSX.utils.aoa_to_sheet([["INFERÊNCIAS E INTELIGÊNCIA DE CARTEIRA"]]);
+    let intelRow = 3;
+
+    if (ins) {
+      // Scorecard de Vendedores
+      const vendRows = ins.vendedores.map(v => [
+        v.vendedor, v.total, v.ativos, `${v.pctAtivo}%`, v.quentes, v.scoreMedio, v.divergencias, v.capital
+      ]);
+      intelRow = addTableToSheet(
+        wsIntel,
+        "Scorecard por Vendedor",
+        ["Vendedor", "Total Clientes", "Clientes Ativos", "% Ativos", "Clientes Quentes (Alta Prio)", "Score Médio Oportunidade", "Qtd Divergências", "Capital sob Gestão"],
+        vendRows,
+        intelRow
+      );
+
+      // Empresas Reabertas
+      const reabRows = [];
+      for (const r of ins.socios.reabertas) {
+        r.inativas.forEach(inact => {
+          r.ativas.forEach(act => {
+            reabRows.push([
+              r.socio, inact.cnpj, inact.razao, inact.situacao, act.cnpj, act.razao, act.score, act.vendedor
+            ]);
+          });
+        });
+      }
+      intelRow = addTableToSheet(
+        wsIntel,
+        "Empresas Reabertas (Sócio ativo + inativo em carteira)",
+        ["Sócio", "CNPJ Inativo", "Razão Inativa", "Situação Inativa", "CNPJ Ativo", "Razão Ativa", "Score Oportunidade CNPJ Ativo", "Vendedor Responsável"],
+        reabRows,
+        intelRow
+      );
+
+      // Grupos Econômicos
+      const grupoRows = ins.socios.grupos.map(g => [
+        g.socio,
+        g.qtde,
+        g.ativas,
+        g.empresas.map(e => `${e.cnpj} (${e.razao} - ${e.situacao})`).join('; ')
+      ]);
+      intelRow = addTableToSheet(
+        wsIntel,
+        "Grupos Econômicos (Sócios comuns)",
+        ["Sócio", "Quantidade CNPJs no Grupo", "Quantidade Ativos", "CNPJs Integrantes e Status"],
+        grupoRows,
+        intelRow
+      );
+
+      // Redes Matriz/Filial
+      const redeRows = ins.redes.map(r => [
+        r.raiz,
+        r.razao,
+        r.unidades,
+        r.ativas,
+        r.estabelecimentos.map(e => `${e.cnpj} (${e.matriz ? 'Matriz' : 'Filial'} - ${e.ativo ? 'Ativa' : 'Inativa'})`).join('; ')
+      ]);
+      intelRow = addTableToSheet(
+        wsIntel,
+        "Redes Matriz/Filial (Mesma raiz de CNPJ)",
+        ["Raiz CNPJ (8d)", "Razão Principal", "Total Unidades", "Unidades Ativas", "Estabelecimentos da Rede"],
+        redeRows,
+        intelRow
+      );
+
+      // Sinais Acionáveis - Dormentes
+      const dormRows = ins.anomalias.dormentes.map(x => [x.cnpj, x.razao, x.dias, x.afinidade, x.vendedor]);
+      intelRow = addTableToSheet(
+        wsIntel,
+        "Sinais Comerciais — Oportunidades Dormentes (Ativas + boa afinidade/porte + sem compra há 1 ano+)",
+        ["CNPJ", "Razão Social", "Dias Inativo", "Afinidade CNAE", "Vendedor"],
+        dormRows,
+        intelRow
+      );
+
+      // Sinais Acionáveis - Reativadas
+      const reativRows = ins.anomalias.recemReativadas.map(x => [x.cnpj, x.razao, x.diasSituacao, x.vendedor]);
+      intelRow = addTableToSheet(
+        wsIntel,
+        "Sinais Comerciais — Recém-Reativadas na RFB (Situação ativa nos últimos 12 meses)",
+        ["CNPJ", "Razão Social", "Dias Desde Reativação", "Vendedor"],
+        reativRows,
+        intelRow
+      );
+
+      // Sinais Acionáveis - Sem Contato
+      const semContRows = ins.anomalias.semContato.map(x => [x.cnpj, x.razao, x.score, x.vendedor]);
+      intelRow = addTableToSheet(
+        wsIntel,
+        "Sinais Comerciais — Bom score, sem canais de contato cadastrados na RFB",
+        ["CNPJ", "Razão Social", "Score Oportunidade", "Vendedor"],
+        semContRows,
+        intelRow
+      );
+
+      // Sinais Acionáveis - Grandes Inativas
+      const grInatRows = ins.anomalias.grandesInativas.map(x => [x.cnpj, x.razao, x.situacao, x.capital]);
+      intelRow = addTableToSheet(
+        wsIntel,
+        "Sinais Comerciais — Alto Capital Social preso em empresa inativa",
+        ["CNPJ", "Razão Social", "Situação Cadastral", "Capital Social"],
+        grInatRows,
+        intelRow
+      );
+    } else {
+      XLSX.utils.sheet_add_aoa(wsIntel, [["Sem dados de inteligência disponíveis"]], { origin: "A3" });
+    }
+    XLSX.utils.book_append_sheet(workbook, wsIntel, "Inteligência");
+
+    // ─────────────────────────────────────────────────────────
+    // 4. ABA: PLANO DE AÇÃO
+    // ─────────────────────────────────────────────────────────
+    const wsPlano = XLSX.utils.aoa_to_sheet([["PLANO DE AÇÃO COMERCIAL — FILAS DE CONTATO"]]);
+    let planoRow = 3;
+
+    if (ins) {
+      // Fila Comercial Principal (Ativas)
+      const filaRows = ins.planoAcao.fila.map(x => {
+        const idx = clients.findIndex(c => c.cnpj === x.cnpj);
+        const res = idx >= 0 ? results[idx] : null;
+        const email = res?.auditResult?.dados_completos_receita?.email || '';
+        const acaoAdmin = res?.auditResult?.acao_administrativa || '';
+        return [
+          x.prioridade, x.cnpj, x.razao, x.socio, x.vendedor, x.score, x.higiene, x.telefone, email, x.acao, acaoAdmin
+        ];
+      });
+      planoRow = addTableToSheet(
+        wsPlano,
+        "Fila Comercial Principal (Empresas Ativas ordenadas por prioridade e score)",
+        ["Prioridade", "CNPJ", "Razão Social", "Sócio Principal / Responsável", "Vendedor", "Score Oportunidade", "Score Higiene", "Telefone", "E-mail", "Ação Comercial Recomendada", "Ação Administrativa"],
+        filaRows,
+        planoRow
+      );
+
+      // Fila Secundária (Inaptas)
+      const inaptRows = ins.planoAcao.inaptas.map(x => {
+        const idx = clients.findIndex(c => c.cnpj === x.cnpj);
+        const res = idx >= 0 ? results[idx] : null;
+        const email = res?.auditResult?.dados_completos_receita?.email || '';
+        return [
+          x.cnpj, x.razao, x.socio, x.vendedor, x.score, x.higiene, x.telefone, email, x.acao
+        ];
+      });
+      planoRow = addTableToSheet(
+        wsPlano,
+        "Gancho Comercial de Regularização (Empresas Inaptas na RFB)",
+        ["CNPJ", "Razão Social", "Sócio Principal / Responsável", "Vendedor", "Score Oportunidade", "Score Higiene", "Telefone", "E-mail", "Abordagem Gancho Comercial"],
+        inaptRows,
+        planoRow
+      );
+    } else {
+      XLSX.utils.sheet_add_aoa(wsPlano, [["Sem dados de plano de ação comercial disponíveis"]], { origin: "A3" });
+    }
+    XLSX.utils.book_append_sheet(workbook, wsPlano, "Plano de Ação");
+
     XLSX.writeFile(workbook, filename);
   }
 

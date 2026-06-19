@@ -598,14 +598,15 @@ textarea {
 
 /* Warning / Retry Button */
 .btn-warning {
-  background: transparent;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: var(--yellow-400);
+  background: rgba(245, 158, 11, 0.1) !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  color: var(--yellow-400) !important;
 }
 
 .btn-warning:hover {
-  background: rgba(245, 158, 11, 0.05);
-  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.25) !important;
+  border-color: rgba(245, 158, 11, 0.8) !important;
+  color: #ffffff !important;
 }
 
 /* Icon-only */
