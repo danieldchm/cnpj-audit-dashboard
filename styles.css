@@ -2409,6 +2409,9 @@ tr.below-threshold td {
 .intel-head { font-size: 1rem; font-weight: 700; color: var(--text-primary); }
 .intel-sub { font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 14px; }
 
+/* Container rolável horizontalmente: em telas estreitas a tabela rola DENTRO
+   do card em vez de vazar pela direita da página; em telas largas preenche 100%. */
+.intel-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .intel-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .intel-table th {
   text-align: left; padding: 8px 10px; color: var(--text-muted);
@@ -2417,7 +2420,7 @@ tr.below-threshold td {
 .intel-table td { padding: 9px 10px; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); vertical-align: top; }
 .intel-table tr:hover td { background: var(--bg-surface-hover); }
 .intel-table code { font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; }
-.acao-cell { max-width: 360px; }
+.acao-cell { min-width: 240px; max-width: 360px; white-space: normal; overflow-wrap: anywhere; }
 
 .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
 .pill.ok { background: rgba(52,211,153,0.15); color: var(--green-400); }

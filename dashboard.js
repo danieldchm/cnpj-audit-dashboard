@@ -241,7 +241,7 @@ const Dashboard = (function () {
       </tr>`;
     }
     h += '</tbody></table>';
-    el.innerHTML = h;
+    el.innerHTML = '<div class="intel-table-wrap">' + h + '</div>';
   }
 
   function renderReabertas(reabertas) {
@@ -367,7 +367,7 @@ const Dashboard = (function () {
       </tr>`;
     }
     h += '</tbody></table>';
-    el.innerHTML = h;
+    el.innerHTML = '<div class="intel-table-wrap">' + h + '</div>';
   }
 
   function _drawInaptas(inaptas) {
@@ -391,7 +391,7 @@ const Dashboard = (function () {
       </tr>`;
     }
     h += '</tbody></table>';
-    el.innerHTML = h;
+    el.innerHTML = '<div class="intel-table-wrap">' + h + '</div>';
   }
 
   function exportPlano() {
