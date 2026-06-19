@@ -21,18 +21,26 @@ Dashboard client-side que:
 
 ```
 cnpj-audit-dashboard/
-├── index.html          # Estrutura principal + navegação por abas
-├── styles.css          # Design system (dark theme, glassmorphism)
-├── app.js              # Lógica de UI, tabela, processamento
-├── utils.js            # Validação CNPJ, auditoria, scoring Distribuidora, exportação
-├── insights.js         # Motor de INFERÊNCIAS AGREGADAS (cruzamentos da base)
-├── dashboard.js        # Camada analítica: abas, gráficos e painéis de inteligência
-├── api.js              # Integração BrasilAPI + web intelligence
-├── run_local.js        # Suite de testes automatizados locais para regras de negócio
-├── sample_data.csv     # Dados de exemplo para testes
-├── mcp-server/         # Servidor MCP para integração com Agentes IAs (ex: Claude)
-└── README.md           # Este arquivo
+├── index.html                    # Interface Web estática
+├── styles.css                    # Design System próprio (CSS)
+├── app.js                        # Lógica de UI, tabela e orquestração (Controller)
+├── utils.js                      # Validações matemáticas, parser de datas e scoring
+├── insights.js                   # Motor de inferências agregadas e QSA
+├── dashboard.js                  # Renderização de abas, painéis e gráficos (Chart.js)
+├── api.js                        # Integração com a BrasilAPI e lotes de workers
+├── run_local.js                  # Suite de testes unitários locais
+├── docs/                         # Documentos de design, apresentação e relatórios
+│   ├── apresentacao_tecnica.md   # Conteúdo técnico da apresentação (MBA)
+│   ├── apresentacao_business.md  # Apresentação executiva comercial
+│   ├── relatorio_vibe_coding.md  # Relatório de engenharia de confiabilidade/vibe coding
+│   └── contexto_dump.md          # Dump de contexto complementar de IA
+├── dados/                        # Datasets de entrada e resultados
+│   ├── amostra_clientes.csv      # Base teste de exemplo para importação
+│   └── resultados/               # Resultados gerados (CSV, JSON, KPI)
+├── mcp-server/                   # Servidor Model Context Protocol nativo
+└── README.md                     # Este arquivo
 ```
+
 
 ## 🧭 Navegação (UI/UX v2)
 

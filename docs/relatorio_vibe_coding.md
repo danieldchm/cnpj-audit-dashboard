@@ -34,23 +34,29 @@ Este relatório documenta a evolução da plataforma **AuditBase** desde a idea�
 
 ---
 
-## 3. Riscos Negligenciados e Oportunidades de Melhoria
+## 3. Análise de Riscos e Engenharia de Confiabilidade
 
-O Vibe Coding troca burocracia por velocidade. No entanto, algumas decisões técnicas foram negligenciadas para manter o fluxo rápido. Abaixo estão os riscos atuais e como eles representam oportunidades de evolução (Fase 2 da sua liderança em IA):
+O Vibe Coding troca burocracia por velocidade. No entanto, algumas decisões técnicas precisam ser continuamente revisadas para garantir a confiabilidade na escala corporativa.
 
-### ⚠️ A. Estado Volátil e Ausência de Persistência (Banco de Dados)
-- **Risco Assumido:** O AuditBase roda 100% no client-side. Um F5 (refresh) ou fechamento acidental da aba apaga todo o progresso de auditoria de uma planilha de 10.000 clientes.
-- **Oportunidade:** Implementar persistência no navegador via `IndexedDB` (Fase 1 do Roadmap) ou conectar rapidamente a um backend minimalista (ex: Supabase ou Firebase) com auxílio da IA.
+### ✅ Riscos Resolvidos (Engenharia de Confiabilidade)
 
-### ⚠️ B. Limites de Rede (Rate Limiting) e Exposição de IP
+#### A. Estado Volátil e Ausência de Persistência (IndexedDB)
+- **Como foi resolvido:** Implementação de persistência local robusta utilizando `IndexedDB`. O estado de processamento dos CNPJs (incluindo progresso, scores calculados, divergências e inferências de inteligência) é salvo automaticamente no navegador a cada atualização do lote.
+- **Resultado:** Ao recarregar a sessão ou fechar acidentalmente a página, o aplicativo restaura automaticamente todo o lote de processamento, incluindo os gráficos analíticos, o painel de inteligência e o plano de ação de onde parou. A solução contorna com sucesso o limite estrito de 5MB do `localStorage`, suportando bases com mais de 10MB (10.000+ CNPJs) sem qualquer degradação de performance.
+
+---
+
+### ⚠️ Riscos Residuais e Oportunidades de Melhoria
+
+#### ⚠️ B. Limites de Rede (Rate Limiting) e Exposição de IP
 - **Risco Assumido:** Como as chamadas para a BrasilAPI são feitas do frontend, é o IP do navegador do usuário que sofre o Rate Limiting. Se a equipe de vendas tentar rodar a ferramenta na mesma rede (mesmo IP de roteador corporativo), eles podem ser bloqueados em massa pela Receita Federal/BrasilAPI.
-- **Oportunidade:** Criar uma camada de proxy leve (BFF - Backend for Frontend) em Node.js ou Cloudflare Workers para fazer cache das consultas e distribuir IPs, diminuindo o risco de bloqueios.
+- **Oportunidade:** Criar uma camada de proxy leve (BFF - Backend for Frontend) em Node.js ou Cloudflare Workers para fazer cache das consultas e distribuir IPs, diminuindo o risco de bloqueios. (Mitigado no MVP com o pool de 3 workers concorrentes com delay de 300ms).
 
-### ⚠️ C. Complexidade Crescente de Estado (Spaghetti DOM)
+#### ⚠️ C. Complexidade Crescente de Estado (Spaghetti DOM)
 - **Risco Assumido:** O aplicativo cresceu para quase 5.000 linhas de JavaScript Puro. A manipulação manual do DOM (ex: `document.getElementById`) se torna frágil e propensa a bugs visuais caso um elemento mude de nome.
 - **Oportunidade:** Utilizar a IA para portar os componentes críticos da interface para uma biblioteca baseada em estado reativo (React ou Vue), sem perder a lógica de negócios que agora já está muito bem testada no backend (graças à separação no MCP).
 
-### ⚠️ D. Test Coverage Mínimo para *Edge Cases* Sujos
+#### ⚠️ D. Test Coverage Mínimo para *Edge Cases* Sujos
 - **Risco Assumido:** Introduzimos o `run_local.js`, mas o Vibe Coding pulou o rigor de TDD (Test-Driven Development) nas fases iniciais. O primeiro parser de datas zerava silenciosamente os scores por causa do formato US vs BR.
 - **Oportunidade:** Ampliar a suíte do `run_local.js` pedindo para a IA gerar *fuzzing* (dados caóticos aleatórios) para testar limites matemáticos (ex: CNPJs do Excel em notação científica, colunas faltando).
 

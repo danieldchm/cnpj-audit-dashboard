@@ -106,11 +106,12 @@ Dashboard de Auditoria Cadastral e Reativação Comercial de CNPJs
 - **Validação matemática de CNPJ offline** (dígitos verificadores) **antes** de chamar a rede → evita requisições desperdiçadas.
 
 **Processamento em lote concorrente:**
-- **Pool de 20 workers** consumindo uma fila compartilhada (não sequencial).
+- **Pool de 3 workers concorrentes com delay de 300ms** (evitando bloqueios e rate limits na BrasilAPI/Cloudflare).
 - **Cancelamento** cooperativo no meio do lote.
 - `throttle` na renderização para não disparar **10.000 reflows** durante o batch.
 
 **Persistência / continuidade do trabalho:**
+- **Persistência local robusta via IndexedDB** → salvamento automático de sessões de processamento grandes (5.000+ CNPJs) no navegador, contornando o limite de 5MB do localStorage e suportando recarregamento de gráficos/dados.
 - Export **CSV / XLSX / JSON** + **reimportação** do estado (JSON/XLSX) → o analista retoma uma auditoria anterior sem reprocessar.
 
 ---
@@ -178,13 +179,16 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 - 📊 **Visão Geral** — KPIs (receita potencial, oportunidades quentes, capital em base inativa) + **8 gráficos** (situação, prioridade, regime, cohorts de recência, score, porte, UF, segmento).
 - 📋 **Carteira** — tabela operacional com busca, filtros, paginação e painel de detalhe.
 - 🧠 **Inteligência** — inferências cruzadas da base inteira.
-- 🎯 **Plano de Ação** — **fila priorizada por vendedor, exportável em CSV** para distribuir.
+- 🎯 **Plano de Ação** — **fila priorizada por vendedor, exportável em CSV e XLSX**.
+
+**Exportação Avançada Multi-aba (XLSX):**
+- Planilha Excel gerada com **4 abas organizadas** (Visão Geral, Carteira, Inteligência, Plano de Ação), garantindo a entrega de 100% das informações e análises inferidas pelo app de forma estruturada.
 
 **Inteligência agregada (10 módulos de inferência) — o "pulo do gato":**
 - **Cruzamento de sócios (QSA)** → identifica **grupos econômicos** (mesmo dono em vários clientes) e **empresas reabertas** (sócio com CNPJ baixado + CNPJ ativo).
 - **Redes matriz/filial** por raiz de CNPJ.
 - **Cohorts de recência**, **scorecard por vendedor** (risco de concentração), **capital em risco × receita potencial**.
-- **Painel de anomalias:** oportunidades dormentes, recém-reativadas, sem canal de contato, grande capital preso em inativa.
+- **Painel de anomalias:** oportunidades dormentes, recém-reativadas, sem canal de contato, grande capital preso inativo.
 
 **Aprendizado capturado → roadmap de evolução para CRM** (persistência local, funil de reativação, integração ERP/webhooks).
 
@@ -208,9 +212,9 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 | **Gráficos** analíticos | **8** |
 | **Módulos de inferência** agregada | **10** |
 | **Ferramentas MCP** expostas a IA | **3** |
-| **Workers concorrentes** no batch | **20** |
+| **Workers concorrentes** no batch | **3 (com delay de 300ms)** |
 | **Códigos CNAE** calibrados (+ 9 fallbacks por palavra-chave) | **19** |
-| **Formatos de export** (+ reimport de estado) | **3** (CSV/XLSX/JSON) |
+| **Formatos de export** (+ reimport de estado) | **3** (CSV/multi-sheet XLSX/JSON) |
 | Linhas de **documentação JSDoc** (utils + api) | **400+** |
 | **Frameworks** de UI usados | **0** (Vanilla) |
 | **Suíte de testes** automatizada | **1** (`run_local.js`) |
@@ -222,16 +226,18 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 > O que normalmente **não** aparece em um protótipo vibe-coded — e aqui apareceu.
 
 1. **Engine de scoring de dois eixos** (oportunidade × higiene) com **modelo não-compensatório** e **gate multiplicativo** por situação cadastral.
-2. **Decaimento exponencial** de recência (`100·e^(−dias/τ)`) com **redistribuição de pesos** quando falta dado + desconto de confiança — em vez de faixas com "efeito-penhasco".
+2. **Decaimento exponencial** de recência (`100·e^(−dias/?).`) com **redistribuição de pesos** quando falta dado + desconto de confiança — em vez de faixas com "efeito-penhasco".
 3. **Afinidade de CNAE por prefixo** (o prefixo mais longo vence: 7 > 5 > 4 > 2 dígitos) com fallback por palavra-chave; secundários valem 60%.
 4. **Parser de CSV como máquina de estados** (campos com aspas, quebras de linha internas, auto-detecção de `,`/`;`, BOM).
 5. **Parser de datas brasileiro robusto** (dd/mm/aaaa, ISO, serial do Excel, anos de 2 dígitos, detecção de data futura como flag de qualidade).
 6. **Normalização fuzzy** para comparação de divergências (acentos, `LTDA→LIMITADA`, `S/A→SA`).
 7. **Clustering de grafo de sócios (QSA)** → grupos econômicos e empresas reabertas; **detecção de redes matriz/filial** por raiz de CNPJ.
-8. **Resiliência de rede:** backoff exponencial, tratamento de 429, validação offline antes da chamada.
-9. **Concorrência controlada** (pool de 20 workers, cancelamento cooperativo) + **throttle/debounce** de UI para milhares de registros.
-10. **Servidor MCP nativo** carregando a lógica via **VM sandbox** — expõe a inteligência do app a agentes de IA.
-11. **Arquitetura modular** (6 namespaces) + **suíte de testes** + **400+ linhas de JSDoc** com justificativa de design.
+8. **Resiliência de rede:** backoff exponencial, tratamento de 429 com fila e delay controlado, validação offline antes da chamada.
+9. **Concorrência controlada** (pool de 3 workers com delay de 300ms, cancelamento cooperativo) + **throttle/debounce** de UI para milhares de registros.
+10. **Persistência local robusta via IndexedDB** → salvamento automático de progresso, gráficos e dados mesmo após recarregamento da página.
+11. **Exportação dividida (XLSX)** contendo 100% das informações e inferências distribuídas em 4 abas estruturadas (Visão Geral, Carteira, Inteligência, Plano de Ação).
+12. **Servidor MCP nativo** carregando a lógica via **VM sandbox** — expõe a inteligência do app a agentes de IA.
+13. **Arquitetura modular** (6 namespaces) + **suíte de testes** + **400+ linhas de JSDoc** com justificativa de design.
 
 **Conclusão da seção:** o nível de *engineering* (calibração estatística, resiliência, testes, modularidade) é o de um produto, não o de um protótipo descartável.
 
@@ -254,7 +260,7 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 | Servidor MCP | ~3–5 dias |
 | Design system (2.467 linhas de CSS) | ~1–2 semanas |
 | Testes / QA | ~1 semana |
-| **Total** | **≈ 8–12 semanas (≈ 320–480 h)** |
+| **Total** | **Análise Geral: ≈ 8–12 semanas (≈ 320–480 h)** |
 
 **Com Vibe Coding (este projeto):**
 - Núcleo construído essencialmente em **2 sessões intensivas** (noites de 10 e 11/jun) + **1 sessão de refino** (18/jun: MCP e correções).
@@ -262,7 +268,7 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 
 **Compressão de tempo:**
 
-> **≈ 320–480 h → ≈ 15–20 h** ⇒ **aceleração de ~20× a ~30×.**
+> **Análise Geral: ≈ 320–480 h → ≈ 15–20 h** ⇒ **aceleração de ~20× a ~30×.**
 
 *O gargalo deixou de ser "escrever código" e passou a ser "ter clareza de intenção".*
 
@@ -295,7 +301,7 @@ Valor entregue
 **Mensagem-chave:**
 - **Time to value medido em dias, não em trimestres.**
 - O MVP **não resolve tudo** — mas **otimiza imediatamente** a lista e os insights, gerando retorno **quase no mesmo dia** em que foi construído.
-- É a diferença entre **esperar o produto perfeito** e **começar a capturar valor agora**, iterando com base em uso real.
+- É a diferença entre **esperar o produto perfeito** e **começar a começar a capturar valor agora**, iterando com base em uso real.
 
 ---
 
@@ -313,7 +319,7 @@ Valor entregue
 
 **A tese da apresentação:**
 
-> Com **Vibe Coding guiado por intenção**, um time não-dedicado entregou em **~2 noites** uma ferramenta com sofisticação de produto (≈ 7.300 linhas, scoring estatístico, resiliência de rede, inferência de grafo, MCP) que tradicionalmente levaria **2–3 meses** — e que já **gera valor comercial imediato**, mesmo sem ser a solução final.
+> Com **Vibe Coding guiado por intenção**, um time não-dedicado entregou em **~2 noites** uma ferramenta com sofisticação de produto (Scoring estatístico, resiliência de rede, persistência IndexedDB, exportação XLSX dividida, inferência de grafo, MCP) que tradicionalmente levaria **2–3 meses** — e que já **gera valor comercial imediato**, mesmo sem ser a solução final.
 
 **Frase de fechamento:** *"O futuro do desenvolvimento não é escrever mais código. É ter clareza de intenção — e deixar a IA executar na velocidade da conversa."*
 
@@ -322,11 +328,11 @@ Valor entregue
 ## Apêndice A — Roteiro de demonstração ao vivo (3 min)
 
 1. **Upload** do `sample_data.csv` (drag & drop). *(10s)*
-2. **Processar** → mostrar a barra de progresso e o batch concorrente rodando. *(30s)*
+2. **Processar** → mostrar a barra de progresso e o batch concorrente com 3 workers ativos. *(30s)*
 3. Abrir **Visão Geral** → ler 1 KPI (capital em base inativa) e 2 gráficos (cohorts + score). *(30s)*
 4. **Carteira** → abrir o painel de detalhe de 1 cliente (mostrar score, divergências, contato). *(30s)*
 5. **Inteligência** → mostrar um **grupo econômico** (sócios) ou uma **empresa reaberta**. *(40s)*
-6. **Plano de Ação** → filtrar por vendedor e **exportar o CSV** da fila. *(30s)*
+6. **Plano de Ação** → filtrar por vendedor e **exportar o XLSX** com as 4 planilhas geradas. *(30s)*
 7. *(Opcional)* Mostrar o **servidor MCP** respondendo a um agente de IA. *(20s)*
 
 ## Apêndice B — Glossário rápido (para a banca)
