@@ -40,3 +40,12 @@ temp/
 
 # Local machine-specific Claude Code settings
 .claude/settings.local.json
+
+# Local LLM models, binaries, and installers
+Ollama-darwin.zip
+ollama-app/
+bin/ollama
+.ollama/
+models/
+*.gguf
+*.bin
