@@ -77,14 +77,17 @@ Problemas de lógica, bugs de UI e escopo de testes exigiram rigor para manter a
 
 Preparação do projeto para a banca avaliadora do MBA e inovações arquiteturais.
 
-- **`a8848ea`, `7125709`, `0100e37`, `f681647` - (chores/docs updates)**  
+- **`a8848ea`, `7125709`, `0100e37` - (chores/docs updates)**  
   Ajustes de repositório, configuração do `launch.json`, atualização da equipe e roadmap.
 
-- **`7ade502 - feat(mcp): adicionar servidor MCP e resolver bug de Perfil Operacional`**  
+- **`b48d5ce - docs: atualizar README.md`**  
+  Reorganização inicial da documentação principal com a arquitetura geral da plataforma.
+
+- **`3171906 - feat(mcp): adicionar servidor MCP e resolver bug de Perfil Operacional`**  
   O AuditBase deixou de ser apenas web e se tornou uma habilidade (Skill) contextual acessível nativamente pelo Claude Desktop (IA), demonstrando expansibilidade extrema.
 
-- **`f26527f`, `92e9eaa`, `9d1b398`, `a518a1f`, `ba6d2c4`, `141fd2d`, `33df188`, `915c8ac`, `df9e73a`, `5499226`, `265345b` - (docs/apresentações)**  
-  Inclusão formal de todas as teses acadêmicas, arquivos de design de 7 passos, versões de negócio e relatórios da jornada.
+- **`cf3959f`, `1768de2`, `dba6321`, `164b5a8`, `1f928eb`, `1c310c0`, `e90b665`, `b9b677f`, `7930a45`, `e2d8501`, `3b439f4` - (docs/apresentações)**  
+  Inclusão formal de todas as teses acadêmicas, arquivos de design de 7 passos, versões de negócio (como a apresentação executiva e relatórios estruturados) e reescrita de mensagens automáticas de Pull Requests para o português brasileiro.
 
 ---
 
@@ -92,47 +95,77 @@ Preparação do projeto para a banca avaliadora do MBA e inovações arquitetura
 
 Testes de estresse com lotes imensos revelaram fragilidades da rede e do navegador. A aplicação evoluiu para suportar o rigor corporativo.
 
-- **`0953b85`, `8620e2d`, `22ea71f` - (Lidando com limites da BrasilAPI)**  
+- **`ddeb400`, `d0a9783`, `ad260ea` - (Lidando com limites da BrasilAPI)**  
   Após enfrentar o *Rate Limiting* por requisições concorrentes, foi incluído controle rigoroso de fila com delay e gerados relatórios e amostras para 5.000 clientes anonimizados.
 
-- **`8c666a8 - feat: adicionar botao 'Reexecutar Erros' e suporte para retry seletivo de CNPJs com falha no lote`**  
+- **`c88a96c - feat: adicionar botao 'Reexecutar Erros' e suporte para retry seletivo de CNPJs com falha no lote`**  
   Uma funcionalidade de *UX de Tolerância a Falhas*, para reprocessar apenas o que caiu, em vez de recomeçar do zero.
 
-- **`be0f2ec - feat: adicionar persistencia de sessao no localStorage do navegador para reter estado apos refresh`**  
+- **`6ede827 - feat: adicionar persistencia de sessao no localStorage do navegador para reter estado apos refresh`**  
   A primeira iteração para evitar perda acidental de dados ao recarregar a tela (F5). Limitada a 5MB.
 
-- **`257d415 - feat: migrar persistencia de sessao para IndexedDB para suportar grandes bases de dados (5.000+ CNPJs)`**  
+- **`913dbf4 - feat: migrar persistencia de sessao para IndexedDB para suportar grandes bases de dados (5.000+ CNPJs)`**  
   O ápice da confiabilidade client-side. Migramos o banco temporário para o robusto `IndexedDB`, suportando bases gigabytes.
 
-- **`97eef36 - feat: exportacao XLSX multifolhas (4 abas) com todas as inferencias...`** e **`05eb9c9`**  
+- **`0eaf7be - feat: exportacao XLSX multifolhas (4 abas) com todas as inferencias...`** e **`2eee877`**  
   Exportação evoluiu para gerar uma planilha rica, categorizada e com parser robusto das datas.
 
-- **`611346f - fix: resolver race condition que mantinha CNPJs travados em status 'Processando' no lote concorrente`**  
+- **`2ae82c8 - fix: resolver race condition que mantinha CNPJs travados em status 'Processando' no lote concorrente`**  
   Eliminação de um bug fantasma que deixava a UI travada.
 
 ---
 
 ### Fase 7: Polimento Visual, UX, Segurança (Quick Wins) e Future-Proofing
 
-Os últimos commits da jornada focam em limpar arestas, refinar performance e adaptar-se ao futuro do Governo Federal.
+Ajustes finais da primeira etapa de refinamentos para limpar arestas, segurar performance e preparar as validações para as novas diretrizes do Governo Federal.
 
-- **`4cd966f`, `df4f107`, `369e6ad`, `076f461`, `4f5188d` - (Layout, Sessão e Organização)**  
-  Alinhamento de paginação, forçar limpeza de cache do CSS, garantir o re-render dos gráficos quando o *IndexedDB* devolvia a sessão, e reorganização completa das pastas do repositório (`docs`, `dados`).
+- **`7340412`, `60c6564`, `ea7d727`, `90be71b`, `e900d45` - (Layout, Sessão e Organização)**  
+  Alinhamento de paginação, limpeza de cache do CSS, re-render automático de gráficos pós-carga de sessão IndexedDB e reorganização de pastas.
 
-- **`add8a3f`, `a23e45d - fix: aplicar quick wins da revisão de código (perf, XSS, a11y, SRI)`**  
-  Saneamento com foco em segurança (escapar inputs para evitar XSS) e atributos nativos de acessibilidade.
+- **`f5c4bcc`, `4d50e34 - fix: aplicar quick wins da revisão de código (perf, XSS, a11y, SRI)`**  
+  Saneamento do código com foco em segurança de dados e acessibilidade.
 
-- **`1273f8e`, `6d5f3c9` - (Estabilidade dos Gráficos e Tabelas)**  
-  Ajuste nos modais e overflow de tabelas do plano de ação e inteligência de base.
+- **`54d1bdf`, `97e743d` - (Estabilidade de Gráficos e Tabelas)**  
+  Contenção de overflows de layout e recriação seletiva de instâncias de gráficos do Chart.js.
 
-- **`e1727a1 - fix: Retomar reprocessa so pendentes/erros + recupera zeros do CNPJ no import`**  
-  Melhoria crucial para lidar com as falhas do Excel que limpa zeros à esquerda do CNPJ, além de não reprocessar acidentalmente clientes que já deram sucesso.
+- **`4a964a3 - fix: Retomar reprocessa so pendentes/erros + recupera zeros do CNPJ no import`**  
+  Proteção contra perda de zeros à esquerda em imports do Excel e controle de re-processamento inteligente.
 
-- **`6d566da - feat: suporte a CNPJ alfanumerico (jul/2026) + ampliar suite de testes`**  
-  O coroamento da plataforma: as validações locais no `run_local.js` e em `utils.js` foram evoluídas para processar as letras dos Novos CNPJs Alfanuméricos do Governo (transição de Julho/2026), deixando o AuditBase 100% à prova do futuro.
+- **`78a0f3d - feat: suporte a CNPJ alfanumerico (jul/2026) + ampliar suite de testes`**  
+  Evolução dos algoritmos matemáticos no frontend e no `run_local.js` para o novo padrão de CNPJs alfanuméricos previsto pelo governo para Julho/2026.
+
+---
+
+### Fase 8: Arquitetura Estendida, Interface de Alta Fidelidade (MCP Inspector) e Refinamento de UX
+
+A evolução final focada no assistente de inteligência artificial em aba exclusiva, conectividade local e melhorias estéticas de controle dimensional de painéis.
+
+- **`88ae159 - fix(A1): importacao XLSX de resultados funcional (round-trip Excel)`**  
+  Estabilização e correção lógica garantindo o fluxo completo de carregamento de planilhas exportadas sem erros de parsing.
+
+- **`042200b - chore: ignorar binários, modelos e instaladores locais de LLM no .gitignore`**  
+  Ignorados arquivos pesados de LLM no controle de versão para manter o repositório leve.
+
+- **`7e2077d - feat(ui/ux): aplicar melhorias da revisão de UI/UX (responsividade móvel, formatação markdown, foco automático, referência ao Qwen)`**  
+  Implementação das melhorias sugeridas na revisão de usabilidade (responsividade móvel, renderização markdown robusta e autofoco automático no input de texto do assistente).
+
+- **`d0f523f - feat(mcp): implementar servidor bridge local do assistente MCP, link para página de chat e atualizar README`**  
+  Divisão da UI com o isolamento do chat em aba dedicada (`chat.html`) conectada a uma ponte local Express.js comunicando com o Ollama local e o MCP Server.
+
+- **`ccfc3b4 - feat(ui/ux): atualizar interface do chat MCP para layout de alta tecnologia MCP Inspector com créditos ao Stitch`**  
+  Design do console MCP Inspector de alta fidelidade desenvolvido a partir de prototipagem baseada no Stitch (stitch.withgoogle.com), apresentando painéis translúcidos, simulador gráfico de carga de CPU e feeds do Reasoning Core.
+
+- **`cc85fd5 - feat(ui/ux): tornar painel inspetor lateral e logs inferiores redimensionáveis dinamicamente via alças de arrastar`**  
+  Adição de splitters interativos que permitem redimensionar fisicamente os blocos do inspetor e de logs em tempo real por meio de eventos de clique e arrasto no mouse.
+
+- **`129e874 - docs: atualizar README principal com splitters redimensionáveis, logs de atividade em tempo real e simulação de CPU`**  
+  Sincronização da documentação principal com as novas tecnologias e funcionalidades aplicadas ao inspetor MCP.
+
+- **`c7322cf - docs(ui): remover subtitulo de versao do cabecalho do MCP Inspector`**  
+  Ajuste pontual de cabeçalho removendo indicações obsoletas de versão no topo da UI.
 
 ---
 
 ### Conclusão
 
-A trilha dos *commits* evidencia como o Vibe Coding orientou uma evolução metódica: do protótipo visual à abstração matemática, do monólito às abas modulares, do `localStorage` frágil ao `IndexedDB` resiliente, culminando em uma ferramenta nativa, integrada via IA, segura e preparada para o Brasil de 2026.
+A trilha dos *commits* evidencia como o Vibe Coding orientou uma evolução metódica: do protótipo visual à abstraction matemática, do monólito às abas modulares, do `localStorage` frágil ao `IndexedDB` resiliente, culminando em uma ferramenta nativa, integrada via IA, segura e preparada para o Brasil de 2026.
