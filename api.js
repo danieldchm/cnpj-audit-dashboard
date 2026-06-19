@@ -293,16 +293,18 @@ const API = (function () {
     const results = [];
 
     const concurrency = options.concurrency || 20;
+    const targetIndices = options.indices || Array.from({ length: clients.length }, (_, i) => i);
 
     try {
       let currentIndex = 0;
       let completedCount = 0;
 
       const workers = Array.from({ length: concurrency }, async () => {
-        while (currentIndex < clients.length) {
+        while (currentIndex < targetIndices.length) {
           if (_cancelFlag) break;
 
-          const i = currentIndex++;
+          const idx = currentIndex++;
+          const i = targetIndices[idx];
           const client = clients[i];
           
           const result = await processClient(client);

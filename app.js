@@ -39,6 +39,7 @@ const App = (function () {
     dom.btnTemplate = $('btn-template');
     dom.btnProcess = $('btn-process');
     dom.btnProcessText = $('btn-process-text');
+    dom.btnRetry = $('btn-retry');
     dom.btnCancel = $('btn-cancel');
     dom.btnExport = $('btn-export');
     dom.exportDropdown = $('export-dropdown');
@@ -138,6 +139,7 @@ const App = (function () {
     // Processing
     dom.btnProcess.addEventListener('click', handleStartProcessing);
     dom.btnCancel.addEventListener('click', handleCancelProcessing);
+    dom.btnRetry.addEventListener('click', handleRetryProcessing);
 
     // Unitário mode
     dom.btnSearchCnpj.addEventListener('click', handleSearchCnpj);
@@ -338,6 +340,7 @@ const App = (function () {
     dom.fileInput.value = '';
     dom.btnProcess.disabled = true;
     dom.btnExport.disabled = true;
+    dom.btnRetry.classList.add('hidden');
     dom.emptyState.classList.remove('hidden');
     dom.tableBody.innerHTML = '';
     dom.pagination.classList.add('hidden');
@@ -481,13 +484,98 @@ const App = (function () {
     dom.fileRemove.style.pointerEvents = '';
     dom.btnExport.disabled = false;
 
+    // Show/hide retry if there are errors
+    const hasErrors = results.some(r => r.status === 'error');
+    if (hasErrors) {
+      dom.btnRetry.classList.remove('hidden');
+    } else {
+      dom.btnRetry.classList.add('hidden');
+    }
+
     // Keep progress bar visible for a moment
     dom.progressBar.style.width = '100%';
     dom.progressCurrent.textContent = 'Processamento concluído!';
     dom.progressEta.textContent = `Tempo total: ${formatDuration(Date.now() - processingStartTime)}`;
 
-    const processed = results.filter(r => r.status !== 'pending').length;
-    showToast(`Processamento finalizado! ${processed}/${clients.length} CNPJs auditados.`, 'success');
+    const processed = results.filter(r => r.status !== 'pending' && r.status !== 'error').length;
+    showToast(`Processamento finalizado! ${processed}/${clients.length} CNPJs com sucesso.`, 'success');
+
+    renderDashboard();
+  }
+
+  async function handleRetryProcessing() {
+    if (clients.length === 0) return;
+
+    const erroredIndices = [];
+    for (let i = 0; i < results.length; i++) {
+      if (results[i] && results[i].status === 'error') {
+        erroredIndices.push(i);
+      }
+    }
+
+    if (erroredIndices.length === 0) {
+      showToast('Nenhum erro cadastrado para reexecutar.', 'warning');
+      return;
+    }
+
+    isProcessing = true;
+    processingStartTime = Date.now();
+
+    // UI updates
+    dom.btnProcess.classList.add('hidden');
+    dom.btnRetry.classList.add('hidden');
+    dom.btnCancel.classList.remove('hidden');
+    dom.progressSection.classList.add('active');
+    dom.uploadArea.style.pointerEvents = 'none';
+    dom.uploadArea.style.opacity = '0.5';
+    dom.fileRemove.style.pointerEvents = 'none';
+
+    showToast(`Reexecutando ${erroredIndices.length} itens que falharam...`, 'info');
+
+    // Reset results of these indices back to pending state
+    erroredIndices.forEach(idx => {
+      results[idx] = {
+        status: 'pending',
+        priority: null,
+        auditResult: null,
+        error: null
+      };
+    });
+
+    renderDashboard();
+
+    await API.processBatch(clients, onBatchProgress, { 
+      delayMs: 300, 
+      concurrency: 3, 
+      indices: erroredIndices 
+    });
+
+    // Processing finished
+    isProcessing = false;
+    dom.btnProcess.classList.remove('hidden');
+    dom.btnCancel.classList.add('hidden');
+    dom.btnProcess.disabled = true;
+    dom.btnProcessText.textContent = 'Processamento Concluído';
+    dom.uploadArea.style.pointerEvents = '';
+    dom.uploadArea.style.opacity = '';
+    dom.fileRemove.style.pointerEvents = '';
+    dom.btnExport.disabled = false;
+
+    // Show/hide retry if there are still errors
+    const stillHasErrors = results.some(r => r.status === 'error');
+    if (stillHasErrors) {
+      dom.btnRetry.classList.remove('hidden');
+    } else {
+      dom.btnRetry.classList.add('hidden');
+    }
+
+    // Keep progress bar visible for a moment
+    dom.progressBar.style.width = '100%';
+    dom.progressCurrent.textContent = 'Processamento concluído!';
+    dom.progressEta.textContent = `Tempo total: ${formatDuration(Date.now() - processingStartTime)}`;
+
+    const processed = results.filter(r => r.status !== 'pending' && r.status !== 'error').length;
+    showToast(`Processamento finalizado! ${processed}/${clients.length} CNPJs com sucesso.`, 'success');
 
     renderDashboard();
   }
@@ -562,6 +650,14 @@ const App = (function () {
     dom.btnCancel.classList.add('hidden');
     dom.btnProcessText.textContent = 'Retomar Processamento';
     dom.btnProcess.disabled = false;
+
+    const hasErrors = results.some(r => r.status === 'error');
+    if (hasErrors) {
+      dom.btnRetry.classList.remove('hidden');
+    } else {
+      dom.btnRetry.classList.add('hidden');
+    }
+
     dom.uploadArea.style.pointerEvents = '';
     dom.uploadArea.style.opacity = '';
     dom.fileRemove.style.pointerEvents = '';
@@ -1209,6 +1305,13 @@ const App = (function () {
 
             dom.btnProcess.disabled = true;
             dom.btnExport.disabled = false;
+            
+            const hasErrors = results.some(r => r.status === 'error');
+            if (hasErrors) {
+              dom.btnRetry.classList.remove('hidden');
+            } else {
+              dom.btnRetry.classList.add('hidden');
+            }
             
             showToast('Análise JSON importada com sucesso!', 'success');
           } else {

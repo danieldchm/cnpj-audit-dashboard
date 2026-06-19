@@ -596,6 +596,18 @@ textarea {
   border-color: rgba(16, 185, 129, 0.5);
 }
 
+/* Warning / Retry Button */
+.btn-warning {
+  background: transparent;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--yellow-400);
+}
+
+.btn-warning:hover {
+  background: rgba(245, 158, 11, 0.05);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
 /* Icon-only */
 .btn-icon {
   padding: 10px;
