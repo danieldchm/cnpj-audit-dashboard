@@ -1051,6 +1051,7 @@ const Utils = (function () {
    * @param {string} [filename]
    */
   function exportToXLSX(clients, results, filename = 'auditoria_cnpj.xlsx') {
+    console.log('[AuditBase] Executando exportação multifolhas XLSX (v1.6)...');
     if (!window.XLSX) {
       console.error('SheetJS (XLSX) não está carregado.');
       return;

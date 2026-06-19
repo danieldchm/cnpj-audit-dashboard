@@ -1286,6 +1286,7 @@ const App = (function () {
       Utils.downloadCSV(csv, `auditbase_resultados_${timestamp}.csv`);
       showToast(`${exportResults.length} resultados exportados em CSV!`, 'success');
     } else if (format === 'xlsx') {
+      console.log('[AuditBase] Solicitando exportação XLSX para', clients.length, 'clientes e', results.length, 'resultados.');
       Utils.exportToXLSX(clients, results, `auditbase_resultados_${timestamp}.xlsx`);
       showToast(`${clients.length} registros exportados em Excel!`, 'success');
     }
