@@ -1117,6 +1117,11 @@ tr.below-threshold td {
   margin-top: var(--space-lg);
 }
 
+.pagination-pages {
+  display: flex;
+  gap: var(--space-xs);
+}
+
 .pagination-btn {
   width: 36px;
   height: 36px;
