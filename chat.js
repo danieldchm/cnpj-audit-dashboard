@@ -60,6 +60,68 @@ window.Chat = (function() {
     // Check status immediately and set interval
     checkStatus();
     statusInterval = setInterval(checkStatus, 5000);
+    
+    // Initialize panel resizers
+    initResizers();
+  }
+  
+  function initResizers() {
+    const sidebarResizer = document.getElementById('sidebar-resizer');
+    const chatSidebar = document.getElementById('chat-sidebar');
+    const footerResizer = document.getElementById('footer-resizer');
+    const logsFooter = document.getElementById('logs-footer');
+    
+    // Sidebar Resizer (Horizontal drag to resize width)
+    if (sidebarResizer && chatSidebar) {
+      sidebarResizer.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        document.body.style.cursor = 'col-resize';
+        sidebarResizer.classList.add('bg-primary/80');
+        
+        function onMouseMove(moveEvent) {
+          const newWidth = window.innerWidth - moveEvent.clientX;
+          if (newWidth >= 220 && newWidth <= 600) {
+            chatSidebar.style.width = newWidth + 'px';
+          }
+        }
+        
+        function onMouseUp() {
+          document.body.style.cursor = 'default';
+          sidebarResizer.classList.remove('bg-primary/80');
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        }
+        
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+    }
+    
+    // Footer Resizer (Vertical drag to resize height)
+    if (footerResizer && logsFooter) {
+      footerResizer.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        document.body.style.cursor = 'row-resize';
+        footerResizer.classList.add('bg-primary/80');
+        
+        function onMouseMove(moveEvent) {
+          const newHeight = window.innerHeight - moveEvent.clientY;
+          if (newHeight >= 64 && newHeight <= 450) {
+            logsFooter.style.height = newHeight + 'px';
+          }
+        }
+        
+        function onMouseUp() {
+          document.body.style.cursor = 'default';
+          footerResizer.classList.remove('bg-primary/80');
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        }
+        
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+    }
   }
   
   async function checkStatus() {
