@@ -118,10 +118,10 @@ const App = (function () {
   }
 
   // ─── Initialization ─────────────────────────────────────────
-  function init() {
+  async function init() {
     cacheDom();
     bindEvents();
-    loadSession();
+    await loadSession();
     updateMetrics();
     if (clients.length === 0) {
       showToast('Bem-vindo ao AuditBase! Importe um CSV para começar.', 'info');
@@ -654,7 +654,6 @@ const App = (function () {
       populateDetailPanel(index);
     }
     saveSessionDebounced();
-  }
   }
 
   function handleCancelProcessing() {
@@ -1472,7 +1471,68 @@ const App = (function () {
   }
 
   // ─── Session Caching ────────────────────────────────────────
-  function saveSession() {
+  // Helper for IndexedDB
+  const DB = {
+    dbName: 'AuditBaseDB',
+    storeName: 'sessionStore',
+    db: null,
+
+    init() {
+      return new Promise((resolve, reject) => {
+        if (this.db) return resolve(this.db);
+        const request = indexedDB.open(this.dbName, 1);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(this.storeName)) {
+            db.createObjectStore(this.storeName);
+          }
+        };
+        request.onsuccess = (e) => {
+          this.db = e.target.result;
+          resolve(this.db);
+        };
+        request.onerror = (e) => reject(e.target.error);
+      });
+    },
+
+    get(key) {
+      return this.init().then((db) => {
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction(this.storeName, 'readonly');
+          const store = transaction.objectStore(this.storeName);
+          const request = store.get(key);
+          request.onsuccess = (e) => resolve(e.target.result);
+          request.onerror = (e) => reject(e.target.error);
+        });
+      });
+    },
+
+    set(key, value) {
+      return this.init().then((db) => {
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction(this.storeName, 'readwrite');
+          const store = transaction.objectStore(this.storeName);
+          const request = store.put(value, key);
+          request.onsuccess = () => resolve();
+          request.onerror = (e) => reject(e.target.error);
+        });
+      });
+    },
+
+    delete(key) {
+      return this.init().then((db) => {
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction(this.storeName, 'readwrite');
+          const store = transaction.objectStore(this.storeName);
+          const request = store.delete(key);
+          request.onsuccess = () => resolve();
+          request.onerror = (e) => reject(e.target.error);
+        });
+      });
+    }
+  };
+
+  async function saveSession() {
     if (clients.length === 0) return;
     const sessionState = {
       clients: clients,
@@ -1481,25 +1541,24 @@ const App = (function () {
       fileSize: dom.fileSize.textContent || ''
     };
     try {
-      localStorage.setItem('auditbase_session', JSON.stringify(sessionState));
+      await DB.set('auditbase_session', sessionState);
     } catch (e) {
-      console.error('Erro ao salvar sessão no localStorage:', e);
+      console.error('Erro ao salvar sessão no IndexedDB:', e);
     }
   }
 
-  function clearSession() {
+  async function clearSession() {
     try {
-      localStorage.removeItem('auditbase_session');
+      await DB.delete('auditbase_session');
     } catch (e) {
-      console.error('Erro ao limpar sessão do localStorage:', e);
+      console.error('Erro ao limpar sessão do IndexedDB:', e);
     }
   }
 
-  function loadSession() {
+  async function loadSession() {
     try {
-      const raw = localStorage.getItem('auditbase_session');
-      if (!raw) return;
-      const state = JSON.parse(raw);
+      const state = await DB.get('auditbase_session');
+      if (!state) return;
       if (state && state.clients && state.results) {
         clients = state.clients;
         results = state.results;
@@ -1538,7 +1597,7 @@ const App = (function () {
         showToast('Sessão anterior recuperada do navegador!', 'success');
       }
     } catch (e) {
-      console.error('Erro ao ler sessão do localStorage:', e);
+      console.error('Erro ao ler sessão do IndexedDB:', e);
     }
   }
 
