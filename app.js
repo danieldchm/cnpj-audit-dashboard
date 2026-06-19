@@ -24,6 +24,11 @@ const App = (function () {
       ? Utils.throttle(renderDashboard, 800)
       : renderDashboard;
 
+  const saveSessionDebounced =
+    (typeof Utils !== 'undefined' && Utils.debounce)
+      ? Utils.debounce(saveSession, 500)
+      : saveSession;
+
   // ─── DOM References ─────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
 
@@ -116,8 +121,11 @@ const App = (function () {
   function init() {
     cacheDom();
     bindEvents();
+    loadSession();
     updateMetrics();
-    showToast('Bem-vindo ao AuditBase! Importe um CSV para começar.', 'info');
+    if (clients.length === 0) {
+      showToast('Bem-vindo ao AuditBase! Importe um CSV para começar.', 'info');
+    }
   }
 
   // ─── Event Binding ──────────────────────────────────────────
@@ -313,6 +321,7 @@ const App = (function () {
         updateMetrics();
         renderDashboard();
         showToast(`${parsed.length} registros importados com sucesso!`, 'success');
+        saveSession();
 
       } catch (err) {
         showToast(`Erro ao processar arquivo: ${err.message}`, 'error');
@@ -348,6 +357,7 @@ const App = (function () {
     closeDetailPanel();
     updateMetrics();
     renderDashboard();
+    clearSession();
     showToast('Arquivo removido.', 'info');
   }
 
@@ -501,6 +511,7 @@ const App = (function () {
     showToast(`Processamento finalizado! ${processed}/${clients.length} CNPJs com sucesso.`, 'success');
 
     renderDashboard();
+    saveSession();
   }
 
   async function handleRetryProcessing() {
@@ -578,6 +589,7 @@ const App = (function () {
     showToast(`Processamento finalizado! ${processed}/${clients.length} CNPJs com sucesso.`, 'success');
 
     renderDashboard();
+    saveSession();
   }
 
   function onBatchProgress(index, total, result) {
@@ -641,6 +653,8 @@ const App = (function () {
     if (selectedIndex === index && results[index].auditResult) {
       populateDetailPanel(index);
     }
+    saveSessionDebounced();
+  }
   }
 
   function handleCancelProcessing() {
@@ -663,6 +677,7 @@ const App = (function () {
     dom.fileRemove.style.pointerEvents = '';
     dom.btnExport.disabled = false;
     showToast('Processamento cancelado pelo usuário.', 'warning');
+    saveSession();
   }
 
   function formatDuration(ms) {
@@ -1314,6 +1329,7 @@ const App = (function () {
             }
             
             showToast('Análise JSON importada com sucesso!', 'success');
+            saveSession();
           } else {
             showToast('Arquivo JSON inválido. Formato esperado não encontrado.', 'error');
           }
@@ -1418,6 +1434,7 @@ const App = (function () {
           dom.btnExport.disabled = false;
           
           showToast(`Arquivo Excel importado com ${clients.length} registros!`, 'success');
+          saveSession();
           
         } catch (err) {
           console.error(err);
@@ -1452,6 +1469,77 @@ const App = (function () {
       toast.classList.add('hiding');
       setTimeout(() => toast.remove(), 300);
     }, 4000);
+  }
+
+  // ─── Session Caching ────────────────────────────────────────
+  function saveSession() {
+    if (clients.length === 0) return;
+    const sessionState = {
+      clients: clients,
+      results: results,
+      fileName: dom.fileName.textContent || '',
+      fileSize: dom.fileSize.textContent || ''
+    };
+    try {
+      localStorage.setItem('auditbase_session', JSON.stringify(sessionState));
+    } catch (e) {
+      console.error('Erro ao salvar sessão no localStorage:', e);
+    }
+  }
+
+  function clearSession() {
+    try {
+      localStorage.removeItem('auditbase_session');
+    } catch (e) {
+      console.error('Erro ao limpar sessão do localStorage:', e);
+    }
+  }
+
+  function loadSession() {
+    try {
+      const raw = localStorage.getItem('auditbase_session');
+      if (!raw) return;
+      const state = JSON.parse(raw);
+      if (state && state.clients && state.results) {
+        clients = state.clients;
+        results = state.results;
+        
+        // Restore UI
+        dom.emptyState.classList.add('hidden');
+        dom.fileInfo.classList.remove('hidden');
+        dom.fileName.textContent = state.fileName || 'Sessão anterior';
+        dom.fileSize.textContent = state.fileSize || '';
+        
+        dom.btnExport.disabled = false;
+        
+        const hasErrors = results.some(r => r.status === 'error');
+        const isDone = results.every(r => r.status !== 'pending');
+        
+        if (isDone) {
+          dom.btnProcess.disabled = true;
+          dom.btnProcessText.textContent = 'Processamento Concluído';
+        } else {
+          dom.btnProcess.disabled = false;
+          dom.btnProcessText.textContent = 'Retomar Processamento';
+        }
+        
+        if (hasErrors) {
+          dom.btnRetry.classList.remove('hidden');
+        } else {
+          dom.btnRetry.classList.add('hidden');
+        }
+        
+        // Populate Vendedor Filter
+        const vendedores = [...new Set(clients.map(c => c.vendedor).filter(Boolean))].sort();
+        dom.filterVendedor.innerHTML = '<option value="">Todos os Vendedores</option>' + 
+          vendedores.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+          
+        applyFilters();
+        showToast('Sessão anterior recuperada do navegador!', 'success');
+      }
+    } catch (e) {
+      console.error('Erro ao ler sessão do localStorage:', e);
+    }
   }
 
   // ─── Helpers ────────────────────────────────────────────────
