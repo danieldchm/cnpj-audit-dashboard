@@ -273,7 +273,9 @@ const App = (function () {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+          // raw:false → lê os valores como TEXTO formatado (em vez de números
+          // crus), preservando zeros à esquerda do CNPJ guardado como número.
+          const jsonRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false });
           // Normalize headers to lowercase
           parsed = jsonRows.map(row => {
             const normalized = {};
@@ -299,9 +301,15 @@ const App = (function () {
         // Initialize clients and results
         clients = parsed.map((row, i) => {
           const rawCnpj = row.cnpj || row.cgccpf || row.cpf_cnpj || '';
+          // Recupera zeros à esquerda perdidos quando o CNPJ veio como número
+          // (planilha Excel ou CSV exportado dela). CNPJ tem 14 dígitos.
+          let cnpjDigits = Utils.cleanCNPJ(rawCnpj);
+          if (cnpjDigits.length > 0 && cnpjDigits.length < 14) {
+            cnpjDigits = cnpjDigits.padStart(14, '0');
+          }
           return {
             index: i,
-            cnpj: Utils.cleanCNPJ(rawCnpj),
+            cnpj: cnpjDigits,
             razao_social: row.razao_social || '', 
             nome_fantasia: row.nome_fantasia || row.fantasia || '',
             cep: row.cep || '',
@@ -490,6 +498,21 @@ const App = (function () {
   async function handleStartProcessing() {
     if (clients.length === 0) return;
 
+    // Processa apenas o que falta: na 1ª execução são todos (pending); ao
+    // "Retomar" após um cancelamento, apenas pendentes/erros — NÃO reconsulta
+    // na BrasilAPI os CNPJs já resolvidos (evita desperdício de rate-limit e
+    // sobrescrita de resultados bons).
+    const targetIndices = [];
+    for (let i = 0; i < results.length; i++) {
+      const st = results[i] && results[i].status;
+      if (st === 'pending' || st === 'error') targetIndices.push(i);
+    }
+    if (targetIndices.length === 0) {
+      showToast('Nada para processar — todos os registros já foram consultados.', 'info');
+      return;
+    }
+    const isResume = targetIndices.length < clients.length;
+
     isProcessing = true;
     processingStartTime = Date.now();
 
@@ -501,11 +524,17 @@ const App = (function () {
     dom.uploadArea.style.opacity = '0.5';
     dom.fileRemove.style.pointerEvents = 'none';
 
-    showToast('Processamento iniciado! Consultando BrasilAPI...', 'info');
+    showToast(
+      isResume
+        ? `Retomando: ${targetIndices.length} registro(s) restante(s)...`
+        : 'Processamento iniciado! Consultando BrasilAPI...',
+      'info'
+    );
 
     await API.processBatch(clients, onBatchProgress, {
       delayMs: 300,
       concurrency: 3,
+      indices: targetIndices,
       onStart: (idx) => {
         results[idx].status = 'processing';
         applyFiltersThrottled();
