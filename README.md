@@ -45,6 +45,17 @@ cnpj-audit-dashboard/
 ```
 
 
+## 📄 Documentação Estendida (docs/)
+
+A pasta [docs/](file:///Users/daniel.costa.br/Downloads/cnpj-audit-dashboard/docs) centraliza os relatórios, apresentações e especificações complementares do projeto para avaliação acadêmica e suporte técnico:
+
+*   **[apresentacao_business.md](file:///Users/daniel.costa.br/Downloads/cnpj-audit-dashboard/docs/apresentacao_business.md)**: Apresentação executiva comercial (V2). Detalha o business case do MVP, a estratégia de mitigação de riscos, estimativas de ROI e o roadmap para CRM.
+*   **[apresentacao_tecnica.md](file:///Users/daniel.costa.br/Downloads/cnpj-audit-dashboard/docs/apresentacao_tecnica.md)**: Relatório técnico acadêmico (7 passos do MVP). Descreve a arquitetura client-side, a pipeline de concorrência de workers, o motor de cálculo de scoring duplo e a integração MCP.
+*   **[relatorio_vibe_coding.md](file:///Users/daniel.costa.br/Downloads/cnpj-audit-dashboard/docs/relatorio_vibe_coding.md)**: Registro histórico da jornada de desenvolvimento por meio de 8 etapas de commits cronológicas, documentando as evoluções e resiliência a falhas da aplicação.
+*   **[prompt_revisao_codigo.md](file:///Users/daniel.costa.br/Downloads/cnpj-audit-dashboard/docs/prompt_revisao_codigo.md)**: Guia e diretrizes de revisão de código sistemática, focada em segurança (XSS/SRI), acessibilidade e robustez local.
+*   **[contexto_dump.md](file:///Users/daniel.costa.br/Downloads/cnpj-audit-dashboard/docs/contexto_dump.md)**: Dump agregador de código-fonte completo utilizado para alimentar o contexto de ferramentas de IA/LLM externas na sustentação do projeto.
+
+
 ## 🧭 Navegação (UI/UX v2)
 
 O dashboard é organizado em quatro abas principais:
