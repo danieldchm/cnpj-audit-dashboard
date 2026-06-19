@@ -87,6 +87,7 @@ Expõe toda a lógica pesada de negócio (validações matemáticas de CNPJ e a 
 
 ### 2. Assistente MCP Local Integrado (`chat.html` & `mcp-bridge/`)
 Criamos uma aba standalone e interativa para chat com IA. Ela se comunica com o **Ollama local** rodando o modelo `qwen2.5-coder:7b` e utiliza o protocolo MCP via uma ponte local (`mcp-bridge/`) para buscar dados do AuditBase em tempo real.
+- **Design UI de Alta Fidelidade (MCP Inspector):** O visual de console/inspetor hacker de alta tecnologia foi concebido e prototipado utilizando a ferramenta **Stitch** (stitch.withgoogle.com).
 - **Storytelling Acadêmico:** O assistente descreve seu raciocínio, exibindo uma caixa roxa destacada com as chamadas de ferramentas MCP realizadas durante a conversa.
 - **Diagnóstico em Tempo Real:** Possui badges no topo do chat monitorando a integridade da ponte Express, do Ollama e da conexão stdio com o MCP Server.
 - **Responsividade Total:** Adaptado e colapsável para dispositivos móveis.
@@ -112,6 +113,8 @@ Embora o **AuditBase** não tenha o objetivo de se tornar um CRM completo de mer
 ## 🛠️ Tecnologias
 
 - **HTML5 / CSS3 / JavaScript** (Vanilla — zero frameworks)
+- **Tailwind CSS** (Utilizado na interface do MCP Inspector)
+- **Stitch** (stitch.withgoogle.com) — Utilizado para concepção do design UI e prototipagem da interface de alta fidelidade
 - **Node.js** (Servidor MCP e Suite de Testes Automáticos `run_local.js`)
 - **Model Context Protocol SDK** (`@modelcontextprotocol/sdk`)
 - **SheetJS** (CDN) — Leitura de arquivos Excel
