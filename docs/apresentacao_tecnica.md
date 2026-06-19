@@ -13,8 +13,8 @@ Dashboard de Auditoria Cadastral e Reativação Comercial de CNPJs
 
 *Um MVP construído em 7 passos, com Vibe Coding*
 
-- **Equipe:** Daniel Roecker · Daniel Carrança (RM370526) · Henrique "Padawan" Gomes Pedroso (RM374303) · Thiago Bezerra · Fabio Correa · Vini (JOYn)
-- **Stack:** HTML5 / CSS3 / JavaScript (Vanilla, zero frameworks) · Node.js · Model Context Protocol
+- **Equipe:** Daniel Roecker · Daniel Carrança (RM370526) · Henrique "Padawan" Gomes Pedroso (RM374303) · Thiago Bezerra · Fabio Correa · Vinicius Costa (JOYn)
+- **Stack:** HTML5 / CSS3 / JavaScript (Vanilla, zero frameworks no app) · Node.js · Model Context Protocol · Ollama/Qwen (LLM local)
 - **Fonte de dados:** Receita Federal via BrasilAPI
 
 **Frase de abertura (mote):** *"Não programamos uma ferramenta. Nós a dirigimos — por intenção — e em poucas noites entregamos algo que normalmente levaria meses."*
@@ -79,15 +79,17 @@ Dashboard de Auditoria Cadastral e Reativação Comercial de CNPJs
 
 | Módulo | Papel | Linhas |
 |---|---|---|
-| `index.html` | Estrutura + navegação por abas | 539 |
-| `styles.css` | Design system próprio (dark, glassmorphism) | 2.467 |
-| `utils.js` | Validação, datas, CSV, **engine de scoring**, export | 1.290 |
-| `api.js` | Integração BrasilAPI + processamento em lote | 366 |
+| `index.html` | Estrutura + navegação por abas | 550 |
+| `styles.css` | Design system próprio (dark, glassmorphism) | 2.505 |
+| `utils.js` | Validação, datas, CSV, **engine de scoring**, export | 1.690 |
+| `api.js` | Integração BrasilAPI + processamento em lote | 412 |
 | `insights.js` | **Motor de inferências agregadas** da base | 529 |
-| `dashboard.js` | Camada analítica (abas, gráficos, painéis) | 438 |
-| `app.js` | Orquestração de UI, tabela, estado | 1.374 |
+| `dashboard.js` | Camada analítica (abas, gráficos, painéis) | 455 |
+| `app.js` | Orquestração de UI, tabela, estado | 1.697 |
 
-**Decisão técnica relevante:** separação de responsabilidades em **6 módulos** com `IIFE`/namespaces (`Utils`, `API`, `Insights`, `Dashboard`, `App`) — algo incomum em protótipos vibe-coded, que tendem a virar um arquivo único.
+**Decisão técnica relevante:** separação de responsabilidades em **módulos** com `IIFE`/namespaces (`Utils`, `API`, `Insights`, `Dashboard`, `App`) — algo incomum em protótipos vibe-coded, que tendem a virar um arquivo único.
+
+> A arquitetura cresceu depois (Passo 7 ampliado) com o **Assistente MCP**: `chat.html` (405) + `chat.js` (644) no front e o bridge local `mcp-bridge/server.js` (240) no back — detalhados no Slide 7.
 
 ---
 
@@ -103,7 +105,7 @@ Dashboard de Auditoria Cadastral e Reativação Comercial de CNPJs
 - **Retry com backoff exponencial** (1s → 2s → 4s, até 3 tentativas).
 - Tratamento dedicado de **HTTP 429** (rate limit) com espera de 5s.
 - **404 / dígito inválido** → sem retry, classificado como permanente.
-- **Validação matemática de CNPJ offline** (dígitos verificadores) **antes** de chamar a rede → evita requisições desperdiçadas.
+- **Validação matemática de CNPJ offline** (dígitos verificadores) **antes** de chamar a rede → evita requisições desperdiçadas. Já preparada para o **novo CNPJ alfanumérico** previsto pela Receita para **julho/2026**.
 
 **Processamento em lote concorrente:**
 - **Pool de 3 workers concorrentes com delay de 300ms** (evitando bloqueios e rate limits na BrasilAPI/Cloudflare).
@@ -161,6 +163,12 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 - 🐛 **`ReferenceError` no export** (função exportada mas não definida) quebrava o módulo inteiro no load.
   → Wrappers de compatibilidade + **suíte de testes automatizada** (`run_local.js`).
 
+- 🐛 **Race condition no lote concorrente:** CNPJs ficavam travados em "Processando" para sempre quando o worker terminava fora de ordem.
+  → Reconciliação de estado por índice + status final garantido ao fim do batch.
+
+- 🐛 **Zeros à esquerda perdidos** na reimportação de XLSX (o Excel tratava o CNPJ como número e comia o `0` inicial).
+  → Re-padding do CNPJ no import + round-trip de planilha validado por teste.
+
 **Segurança e dados:**
 - **Privacidade by design:** a base nunca sai do navegador (client-side).
 - **Escape de HTML** na renderização (proteção contra injeção via dados da planilha).
@@ -192,7 +200,15 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 
 **Aprendizado capturado → roadmap de evolução para CRM** (persistência local, funil de reativação, integração ERP/webhooks).
 
-**Bônus de governança (Passo 7 ampliado):** **Servidor MCP nativo** expõe a lógica de negócio (validação + pipeline de auditoria) como **3 ferramentas para agentes de IA** (ex.: Claude Desktop) — a ferramenta vira uma *capability* reutilizável por IA.
+**Bônus de governança (Passo 7 ampliado) — integração com IA por dois lados:**
+
+1. **Servidor MCP nativo** (`mcp-server/index.js`) — expõe a lógica de negócio como **3 ferramentas** para agentes externos (ex.: Claude Desktop): `validate_cnpj`, `fetch_cnpj_data` e `generate_audit_result` (pipeline completo). A lógica do app vira uma *capability* reutilizável por qualquer IA agêntica.
+
+2. **Assistente MCP local integrado** (`chat.html` + `mcp-bridge/`) — uma aba dedicada de **chat com IA rodando 100% na máquina**: um **LLM local via Ollama** (`qwen2.5-coder:7b`) conversa com a base através do protocolo MCP, intermediado por uma **ponte Express local**. Tudo client-side/local — nenhum dado vai para a nuvem.
+   - **Console "MCP Inspector" de alta fidelidade** (UI prototipada no **Stitch**): três painéis com **splitters redimensionáveis** (sidebar 220–600px, rodapé de logs 64–450px).
+   - **Terminal de logs em tempo real** (`USER_INPUT`, `API_CALL`, `MCP_CALL`, `REASONING`) com timestamps e latência em ms.
+   - **Reasoning Core** — o bloco `[Raciocínio MCP]` é extraído e exibido em destaque, tornando o raciocínio da IA transparente.
+   - **Simulador gráfico de carga de CPU** + **diagnóstico de conectividade** (polling de 5s nos badges Bridge / Ollama / MCP Server, com alertas `SYSTEM_OPERATIONAL` / `SYSTEM_DEGRADED`).
 
 ---
 
@@ -202,21 +218,22 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 
 | Métrica | Valor |
 |---|---|
-| **Linhas de código** (HTML+CSS+JS, sem dependências) | **≈ 7.300** |
-| Linhas de **JavaScript** (lógica pura) | **≈ 4.150** |
-| Linhas de **CSS** (design system próprio) | **2.467** |
-| **Módulos** arquiteturados | **6** (+ servidor MCP) |
+| **Linhas de código** (HTML+CSS+JS, sem dependências) | **≈ 8.900** |
+| Linhas de **JavaScript** (lógica pura) | **≈ 5.400** |
+| Linhas de **CSS** (design system próprio) | **2.505** |
+| **Módulos** client-side arquiteturados | **7** (+ servidor MCP + bridge local) |
 | **Funções** implementadas | **255+** |
-| **Commits** (histórico da iteração) | **25** |
+| **Commits** (histórico da iteração) | **68** |
 | **Campos enriquecidos** no export | **40+** |
 | **Gráficos** analíticos | **8** |
 | **Módulos de inferência** agregada | **10** |
 | **Ferramentas MCP** expostas a IA | **3** |
+| **Assistente MCP local** (chat + bridge Ollama/Qwen) | **1** |
 | **Workers concorrentes** no batch | **3 (com delay de 300ms)** |
 | **Códigos CNAE** calibrados (+ 9 fallbacks por palavra-chave) | **19** |
 | **Formatos de export** (+ reimport de estado) | **3** (CSV/multi-sheet XLSX/JSON) |
-| Linhas de **documentação JSDoc** (utils + api) | **400+** |
-| **Frameworks** de UI usados | **0** (Vanilla) |
+| Linhas de **documentação JSDoc** (módulos do app) | **350+** |
+| **Frameworks** de UI no app principal | **0** (Vanilla — Tailwind só no console MCP) |
 | **Suíte de testes** automatizada | **1** (`run_local.js`) |
 
 ---
@@ -236,8 +253,10 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 9. **Concorrência controlada** (pool de 3 workers com delay de 300ms, cancelamento cooperativo) + **throttle/debounce** de UI para milhares de registros.
 10. **Persistência local robusta via IndexedDB** → salvamento automático de progresso, gráficos e dados mesmo após recarregamento da página.
 11. **Exportação dividida (XLSX)** contendo 100% das informações e inferências distribuídas em 4 abas estruturadas (Visão Geral, Carteira, Inteligência, Plano de Ação).
-12. **Servidor MCP nativo** carregando a lógica via **VM sandbox** — expõe a inteligência do app a agentes de IA.
-13. **Arquitetura modular** (6 namespaces) + **suíte de testes** + **400+ linhas de JSDoc** com justificativa de design.
+12. **Servidor MCP nativo** carregando a lógica via **VM sandbox** — expõe a inteligência do app como 3 ferramentas para agentes de IA externos.
+13. **Assistente MCP local** (`chat.html` + bridge Express) com **LLM rodando na máquina** (Ollama/`qwen2.5-coder`): console "MCP Inspector" (UI Stitch) com **splitters redimensionáveis**, **logs de protocolo em tempo real**, **Reasoning Core** transparente, simulador de CPU e **diagnóstico de conectividade** por polling — IA conversando com a base sem sair do local.
+14. **Future-proofing regulatório:** algoritmo de validação já compatível com o **CNPJ alfanumérico** (jul/2026), coberto por testes no `run_local.js`.
+15. **Arquitetura modular** (7 módulos client-side + namespaces) + **suíte de testes** + **350+ linhas de JSDoc** com justificativa de design.
 
 **Conclusão da seção:** o nível de *engineering* (calibração estatística, resiliência, testes, modularidade) é o de um produto, não o de um protótipo descartável.
 
@@ -257,18 +276,18 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 | Motor de inferências (QSA, redes, cohorts) | ~1–2 semanas |
 | Dashboard (8 gráficos, 4 abas, tabela) | ~2–3 semanas |
 | Export/Import (CSV/XLSX/JSON) | ~3–5 dias |
-| Servidor MCP | ~3–5 dias |
-| Design system (2.467 linhas de CSS) | ~1–2 semanas |
-| Testes / QA | ~1 semana |
-| **Total** | **Análise Geral: ≈ 8–12 semanas (≈ 320–480 h)** |
+| Servidor MCP + assistente de chat com LLM local (bridge) | ~1–2 semanas |
+| Design system (2.505 linhas de CSS) + console MCP Inspector | ~1–2 semanas |
+| Testes / QA + future-proofing (CNPJ alfanumérico) | ~1 semana |
+| **Total** | **Análise Geral: ≈ 10–14 semanas (≈ 400–560 h)** |
 
 **Com Vibe Coding (este projeto):**
-- Núcleo construído essencialmente em **2 sessões intensivas** (noites de 10 e 11/jun) + **1 sessão de refino** (18/jun: MCP e correções).
-- Esforço ativo estimado: **≈ 15–20 horas guiadas**.
+- Construído em **algumas sessões intensivas** ao longo de **10–19/jun**: núcleo nas noites de 10–11/jun + sessões de refino (MCP, IndexedDB, segurança, CNPJ alfanumérico e o assistente MCP com console Inspector).
+- Esforço ativo estimado: **≈ 20–28 horas guiadas**.
 
 **Compressão de tempo:**
 
-> **Análise Geral: ≈ 320–480 h → ≈ 15–20 h** ⇒ **aceleração de ~20× a ~30×.**
+> **Análise Geral: ≈ 400–560 h → ≈ 20–28 h** ⇒ **aceleração de ~20× a ~30×.**
 
 *O gargalo deixou de ser "escrever código" e passou a ser "ter clareza de intenção".*
 
@@ -315,11 +334,11 @@ Valor entregue
 4. **Dados** reais da Receita (BrasilAPI) com resiliência de produção.
 5. **Iteração por intenção** (v1 → v2 do scoring, 25 commits).
 6. **Revisão crítica** que caçou bugs silenciosos e blindou segurança/privacidade.
-7. **Demonstrar & decidir** → 4 abas, inteligência agregada, plano de ação, MCP.
+7. **Demonstrar & decidir** → 4 abas, inteligência agregada, plano de ação, servidor MCP **e assistente MCP local com LLM**.
 
 **A tese da apresentação:**
 
-> Com **Vibe Coding guiado por intenção**, um time não-dedicado entregou em **~2 noites** uma ferramenta com sofisticação de produto (Scoring estatístico, resiliência de rede, persistência IndexedDB, exportação XLSX dividida, inferência de grafo, MCP) que tradicionalmente levaria **2–3 meses** — e que já **gera valor comercial imediato**, mesmo sem ser a solução final.
+> Com **Vibe Coding guiado por intenção**, um time não-dedicado entregou em **poucas noites** uma ferramenta com sofisticação de produto (Scoring estatístico, resiliência de rede, persistência IndexedDB, exportação XLSX dividida, inferência de grafo, servidor MCP + assistente de IA local) que tradicionalmente levaria **2–3 meses** — e que já **gera valor comercial imediato**, mesmo sem ser a solução final.
 
 **Frase de fechamento:** *"O futuro do desenvolvimento não é escrever mais código. É ter clareza de intenção — e deixar a IA executar na velocidade da conversa."*
 
@@ -333,7 +352,7 @@ Valor entregue
 4. **Carteira** → abrir o painel de detalhe de 1 cliente (mostrar score, divergências, contato). *(30s)*
 5. **Inteligência** → mostrar um **grupo econômico** (sócios) ou uma **empresa reaberta**. *(40s)*
 6. **Plano de Ação** → filtrar por vendedor e **exportar o XLSX** com as 4 planilhas geradas. *(30s)*
-7. *(Opcional)* Mostrar o **servidor MCP** respondendo a um agente de IA. *(20s)*
+7. *(Opcional)* Abrir o **Assistente MCP** (`chat.html`): fazer uma pergunta sobre a base e mostrar o **console Inspector** — logs em tempo real, Reasoning Core e badges de conexão (Bridge/Ollama/MCP). *(30s)*
 
 ## Apêndice B — Glossário rápido (para a banca)
 
@@ -342,11 +361,13 @@ Valor entregue
 - **Gate multiplicativo / não-compensatório** — fator que multiplica o score; um fator 0 zera, e bons componentes não "compram de volta" uma empresa baixada.
 - **Cohort de recência** — agrupamento por tempo desde a última compra.
 - **MCP (Model Context Protocol)** — protocolo que expõe ferramentas/capacidades para agentes de IA.
+- **Ollama / Qwen** — runtime de LLM local (modelo `qwen2.5-coder:7b`) que roda o assistente de chat na própria máquina, sem enviar dados à nuvem.
+- **Bridge (ponte MCP)** — servidor Express local que liga o chat ao Ollama e ao servidor MCP, orquestrando as chamadas de ferramenta.
 - **Vibe Coding** — desenvolvimento guiado por intenção em linguagem natural, com a IA gerando e iterando o código.
 
 ## Apêndice C — Fonte dos números (rastreabilidade)
 
 - Linhas de código: `wc -l` sobre os arquivos versionados (exclui `node_modules`).
-- Commits e datas: histórico `git log` (10–18/jun/2026).
-- Funções, módulos, gráficos, ferramentas MCP, CNAEs: contagem direta no código-fonte (`utils.js`, `api.js`, `insights.js`, `dashboard.js`, `app.js`, `mcp-server/index.js`).
+- Commits e datas: histórico `git log` (**68 commits**, 10–19/jun/2026).
+- Funções, módulos, gráficos, ferramentas MCP, CNAEs: contagem direta no código-fonte (`utils.js`, `api.js`, `insights.js`, `dashboard.js`, `app.js`, `chat.js`, `mcp-server/index.js`, `mcp-bridge/server.js`).
 - Tempo tradicional: **estimativa** por frente de trabalho (não medição) — apresentar como ordem de grandeza, não como número exato.

@@ -1,7 +1,7 @@
 # AuditBase — De uma planilha parada a vendas no mesmo dia
 ### Versão Business · linguagem simples, foco em valor
 
-> **Conteúdo da apresentação (versão executiva).** Esta é a **v2**, escrita para um público de **negócios** — sem jargão técnico. A versão técnica completa continua em `APRESENTACAO.md`.
+> **Conteúdo da apresentação (versão executiva).** Esta é a **v2**, escrita para um público de **negócios** — sem jargão técnico. A versão técnica completa está em `apresentacao_tecnica.md`.
 > Aqui é **só o conteúdo**. O design dos slides vem depois.
 
 ---
@@ -13,7 +13,7 @@ A ferramenta que transforma uma base de clientes esquecida em **oportunidades de
 
 *MBA 3ABL · AI Leadership — Strategy, Governance & Scale*
 
-**Equipe:** Daniel Roecker · Daniel Carrança · Henrique "Padawan" Gomes Pedroso · Thiago Bezerra · Fabio Correa · Vini (JOYn)
+**Equipe:** Daniel Roecker · Daniel Carrança · Henrique "Padawan" Gomes Pedroso · Thiago Bezerra · Fabio Correa · Vinicius Costa (JOYn)
 
 **Em uma frase:** *Pegamos uma planilha de 10 mil clientes inativos e a transformamos em uma lista de "ligue para estes primeiro" — em dias, não em meses.*
 
@@ -50,6 +50,8 @@ A ferramenta que transforma uma base de clientes esquecida em **oportunidades de
 6. Você **exporta essa lista** e entrega pronta para o time comercial.
 
 **A analogia:** é como ter um **assistente que lê 10 mil cadastros numa madrugada**, separa o joio do trigo, e te entrega de manhã a lista de "comece por aqui".
+
+**E tem um plus:** a ferramenta agora vem com um **assistente de IA com quem você conversa em português** — pergunta "como está fulano?" ou "quem devo priorizar?" e ele responde consultando a base. E o melhor: essa IA **roda dentro do próprio computador**, então **nenhum dado de cliente é enviado para a internet**.
 
 ---
 
@@ -97,6 +99,7 @@ A ferramenta que transforma uma base de clientes esquecida em **oportunidades de
 - 😴 **Oportunidades adormecidas:** bom cliente, do perfil certo, que simplesmente parou de comprar.
 - 💰 **Dinheiro parado:** mostra quanto capital está "preso" em clientes inativos da base.
 - 👥 **Saúde da carteira por vendedor:** ajuda a gestão a equilibrar e cobrar resultados.
+- 💬 **Converse com a base:** um **assistente de IA local** responde perguntas em português ("quem priorizar nesta região?") consultando os dados — sem o gestor precisar abrir planilha.
 
 **Por que isso importa:** esses são insights que um humano **levaria semanas** para cruzar manualmente em 10 mil cadastros — e que aqui saem **automaticamente**.
 
@@ -112,22 +115,24 @@ A ferramenta que transforma uma base de clientes esquecida em **oportunidades de
 | Informações oficiais trazidas por cliente | **40+ campos** |
 | Painéis visuais de gestão | **8 gráficos** |
 | Tipos de "oportunidade escondida" que ela descobre | **10** |
-| Tamanho da ferramenta construída | **≈ 7.300 linhas** de código |
+| Tamanho da ferramenta construída | **≈ 8.900 linhas** de código |
+| Assistente de IA que conversa com a base | **1** (roda local) |
 | Tempo para começar a gerar valor | **Dias**, não meses |
 | Custo de infraestrutura para rodar | **Praticamente zero** (roda no navegador) |
 | Segurança dos dados | A base **não sai do computador** do usuário |
+| Preparada para a mudança do **CNPJ alfanumérico** (jul/2026) | **Sim** |
 
-**Leitura de negócio:** muito resultado, custo de operação quase nulo e **privacidade preservada** — os dados dos clientes nunca saem para um servidor externo.
+**Leitura de negócio:** muito resultado, custo de operação quase nulo e **privacidade preservada** — os dados dos clientes nunca saem para um servidor externo. E já **pronta para a nova regra de CNPJ** que entra em 2026.
 
 ---
 
 ## Slide 7 — Velocidade: o que mais impressiona
 
 **Quanto tempo levaria do jeito tradicional?**
-Uma ferramenta deste tamanho — com painéis, integração com a Receita, sistema de pontuação e inteligência de base — normalmente leva **2 a 3 meses** de trabalho de um desenvolvedor.
+Uma ferramenta deste tamanho — com painéis, integração com a Receita, sistema de pontuação, inteligência de base **e um assistente de IA próprio** — normalmente leva **2 a 3 meses** de trabalho de um desenvolvedor.
 
 **Quanto levou com IA (Vibe Coding)?**
-O essencial foi construído no equivalente a **cerca de 2 noites de trabalho guiado**, mais um dia de ajustes.
+O essencial foi construído em **poucas noites de trabalho guiado**, ao longo de cerca de **dez dias**, somando os refinamentos (segurança, assistente de IA e preparo para o novo CNPJ).
 
 > ### De ~2–3 meses para ~2 noites.
 > ### Uma aceleração de aproximadamente **20 a 30 vezes**.
@@ -174,7 +179,7 @@ Valor para o negócio
 
 **O que esta versão ainda NÃO é:**
 - Não é um CRM completo (não gerencia todo o funil de vendas ainda).
-- Não guarda histórico de interações entre uma sessão e outra (por enquanto).
+- Já **salva o progresso da auditoria no navegador** (não se perde ao recarregar), mas ainda **não registra o histórico de cada contato** ("liguei", "mandei WhatsApp") — isso é a próxima fase.
 - A "inteligência de mercado" sobre cada empresa ainda é simplificada.
 
 **Por que isso é uma força, e não uma fraqueza:**
@@ -182,7 +187,7 @@ Valor para o negócio
 - A evolução é **incremental** — pagamos para crescer só o que provar valor.
 
 **Roadmap de evolução (em direção a um CRM):**
-1. **Memória:** salvar o progresso e registrar contatos ("liguei", "mandei WhatsApp").
+1. **Memória:** o salvamento do progresso **já está pronto** (auto-save no navegador); falta registrar o histórico de contatos ("liguei", "mandei WhatsApp").
 2. **Funil de reativação:** acompanhar o cliente do "a contatar" até o "comprou de novo".
 3. **Integração:** conectar com os sistemas internos da empresa (ERP) automaticamente.
 
@@ -212,5 +217,6 @@ Valor para o negócio
 4. **Abrir um cliente:** ver o cadastro corrigido, o telefone e a abordagem sugerida. *(30s)*
 5. **Inteligência:** mostrar um caso de "mesmo dono, várias empresas". *(40s)*
 6. **Plano de Ação:** filtrar por vendedor e **exportar a lista** pronta para usar. *(30s)*
+7. *(Opcional)* **Assistente de IA:** abrir o chat e perguntar em português "quem devo priorizar?" — mostrando a resposta vinda da própria base, com a IA rodando no computador. *(30s)*
 
 **Mensagem ao final da demo:** *"Tudo isso foi construído em poucas noites — e já está pronto para o time usar amanhã."*
