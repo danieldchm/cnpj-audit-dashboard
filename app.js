@@ -409,7 +409,8 @@ const App = (function () {
 
   // ─── CNPJ Input Formatting ─────────────────────────────────
   function handleCnpjInputFormat(e) {
-    let value = e.target.value.replace(/\D/g, '');
+    // Aceita letras (CNPJ alfanumérico, jul/2026) além de dígitos
+    let value = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     if (value.length > 14) value = value.slice(0, 14);
 
     let formatted = '';

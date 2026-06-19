@@ -149,7 +149,10 @@ const Utils = (function () {
    */
   function cleanCNPJ(cnpj) {
     if (typeof cnpj !== 'string') cnpj = String(cnpj ?? '');
-    return cnpj.replace(/\D/g, '');
+    // Mantém letras (CNPJ alfanumérico — novo padrão a partir de jul/2026) e
+    // dígitos; remove a máscara (. / -) e espaços. Para CNPJ numérico o
+    // resultado é idêntico ao comportamento anterior.
+    return cnpj.toUpperCase().replace(/[^A-Z0-9]/g, '');
   }
 
   /**
@@ -166,27 +169,40 @@ const Utils = (function () {
 
   /**
    * Valida CNPJ pelo algoritmo oficial de dígitos verificadores.
+   *
+   * Suporta os DOIS formatos:
+   *  - Numérico (atual): 14 dígitos.
+   *  - Alfanumérico (novo padrão a partir de jul/2026): 12 posições
+   *    alfanuméricas [A-Z0-9] + 2 dígitos verificadores numéricos.
+   *
+   * O valor de cada caractere no cálculo é `código ASCII − 48`
+   * ('0'→0…'9'→9, 'A'→17…'Z'→42). Para CNPJ numérico isto é idêntico a
+   * `Number(dígito)`, então o comportamento dos CNPJs atuais não muda.
+   *
    * @param {string} cnpj
    * @returns {boolean}
    */
   function validateCNPJ(cnpj) {
-    const digits = cleanCNPJ(cnpj);
-    if (digits.length !== 14) return false;
-    if (/^(\d)\1{13}$/.test(digits)) return false;
+    const v = cleanCNPJ(cnpj);
+    if (v.length !== 14) return false;
+    // 12 posições alfanuméricas + 2 dígitos verificadores numéricos
+    if (!/^[A-Z0-9]{12}[0-9]{2}$/.test(v)) return false;
+    // rejeita 14 caracteres idênticos (ex.: 000…0, 111…1)
+    if (/^(.)\1{13}$/.test(v)) return false;
 
-    const nums = digits.split('').map(Number);
+    const val = (ch) => ch.charCodeAt(0) - 48;
 
     const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
     let sum1 = 0;
-    for (let i = 0; i < 12; i++) sum1 += nums[i] * weights1[i];
+    for (let i = 0; i < 12; i++) sum1 += val(v[i]) * weights1[i];
     const r1 = sum1 % 11;
-    if (nums[12] !== (r1 < 2 ? 0 : 11 - r1)) return false;
+    if (Number(v[12]) !== (r1 < 2 ? 0 : 11 - r1)) return false;
 
     const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
     let sum2 = 0;
-    for (let i = 0; i < 13; i++) sum2 += nums[i] * weights2[i];
+    for (let i = 0; i < 13; i++) sum2 += val(v[i]) * weights2[i];
     const r2 = sum2 % 11;
-    if (nums[13] !== (r2 < 2 ? 0 : 11 - r2)) return false;
+    if (Number(v[13]) !== (r2 < 2 ? 0 : 11 - r2)) return false;
 
     return true;
   }
