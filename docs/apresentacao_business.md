@@ -15,13 +15,13 @@ A ferramenta que transforma uma base de clientes esquecida em **oportunidades de
 
 **Equipe:** Daniel Roecker · Daniel Carrança · Henrique "Padawan" Gomes Pedroso · Thiago Bezerra · Fabio Correa · Vinicius Costa (JOYn)
 
-**Em uma frase:** *Pegamos uma planilha de 10 mil clientes inativos e a transformamos em uma lista de "ligue para estes primeiro" — em dias, não em meses.*
+**Em uma frase:** *Pegamos uma planilha de 70 mil clientes inativos e a transformamos em uma lista de "ligue para estes primeiro" — em dias, não em meses.*
 
 ---
 
 ## Slide 1 — O problema de negócio
 
-**A situação:** uma distribuidora atacadista tem **mais de 10.000 empresas cadastradas** que pararam de comprar. Esse cadastro está parado numa planilha.
+**A situação:** uma distribuidora atacadista tem **mais de 70.000 empresas cadastradas** que pararam de comprar. Esse cadastro está parado numa planilha.
 
 **A dor, no dia a dia do vendedor:**
 - Ele **não sabe** se a empresa ainda existe ou já fechou.
@@ -49,7 +49,7 @@ A ferramenta que transforma uma base de clientes esquecida em **oportunidades de
 5. Ela monta uma **lista priorizada**, já com telefone, e-mail e a **melhor abordagem** para cada um.
 6. Você **exporta essa lista** e entrega pronta para o time comercial.
 
-**A analogia:** é como ter um **assistente que lê 10 mil cadastros numa madrugada**, separa o joio do trigo, e te entrega de manhã a lista de "comece por aqui".
+**A analogia:** é como ter um **assistente que lê 70 mil cadastros numa madrugada**, separa o joio do trigo, e te entrega de manhã a lista de "comece por aqui".
 
 **E tem um plus:** a ferramenta agora vem com um **assistente de IA com quem você conversa em português** — pergunta "como está fulano?" ou "quem devo priorizar?" e ele responde consultando a base. E o melhor: essa IA **roda dentro do próprio computador**, então **nenhum dado de cliente é enviado para a internet**.
 
@@ -61,7 +61,7 @@ A ferramenta que transforma uma base de clientes esquecida em **oportunidades de
 
 | Passo | O que significa | O que fizemos |
 |---|---|---|
-| **1. Definir o problema** | Achar uma dor real e pequena | Base de 10 mil clientes inativos sem priorização |
+| **1. Definir o problema** | Achar uma dor real e pequena | Base de 70 mil clientes inativos sem priorização |
 | **2. Escrever o brief** | Dizer em palavras simples o que se quer | "Transformar a planilha numa lista de quem ligar primeiro" |
 | **3. Gerar o protótipo** | Fazer a primeira versão funcionar | Em poucas horas, já tínhamos a base rodando |
 | **4. Conectar dados** | Sair do faz-de-conta para dados reais | Plugamos na **Receita Federal** (dados oficiais) |
@@ -101,7 +101,7 @@ A ferramenta que transforma uma base de clientes esquecida em **oportunidades de
 - 👥 **Saúde da carteira por vendedor:** ajuda a gestão a equilibrar e cobrar resultados.
 - 💬 **Converse com a base:** um **assistente de IA local** responde perguntas em português ("quem priorizar nesta região?") consultando os dados — sem o gestor precisar abrir planilha.
 
-**Por que isso importa:** esses são insights que um humano **levaria semanas** para cruzar manualmente em 10 mil cadastros — e que aqui saem **automaticamente**.
+**Por que isso importa:** esses são insights que um humano **levaria semanas** para cruzar manualmente em 70 mil cadastros — e que aqui saem **automaticamente**.
 
 ---
 
@@ -111,7 +111,7 @@ A ferramenta que transforma uma base de clientes esquecida em **oportunidades de
 
 | O que medimos | Número |
 |---|---|
-| Clientes que a ferramenta processa | **10.000+** |
+| Clientes que a ferramenta processa | **70.000+** |
 | Informações oficiais trazidas por cliente | **40+ campos** |
 | Painéis visuais de gestão | **8 gráficos** |
 | Tipos de "oportunidade escondida" que ela descobre | **10** |

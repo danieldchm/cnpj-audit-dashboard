@@ -28,7 +28,7 @@ Dashboard de Auditoria Cadastral e Reativação Comercial de CNPJs
 **Contexto:** distribuidora atacadista (ICP = pequeno varejo: papelarias, livrarias, escolas).
 
 **A dor concreta:**
-- Base com **10.000+ CNPJs** cadastrados, muitos **sem compra recente**.
+- Base com **70.000+ CNPJs** cadastrados, muitos **sem compra recente**.
 - O time comercial **não sabe** quais empresas ainda estão ativas, quais têm dados de contato corretos, e **por quem começar**.
 - Resultado: vendedores gastam tempo ligando para empresas **baixadas**, com telefone errado, ou de baixo potencial — enquanto oportunidades quentes ficam paradas na planilha.
 
@@ -110,7 +110,7 @@ Dashboard de Auditoria Cadastral e Reativação Comercial de CNPJs
 **Processamento em lote concorrente:**
 - **Pool de 3 workers concorrentes com delay de 300ms** (evitando bloqueios e rate limits na BrasilAPI/Cloudflare).
 - **Cancelamento** cooperativo no meio do lote.
-- `throttle` na renderização para não disparar **10.000 reflows** durante o batch.
+- `throttle` na renderização para não disparar **70.000 reflows** durante o batch.
 
 **Persistência / continuidade do trabalho:**
 - **Persistência local robusta via IndexedDB** → salvamento automático de sessões de processamento grandes (5.000+ CNPJs) no navegador, contornando o limite de 5MB do localStorage e suportando recarregamento de gráficos/dados.
@@ -333,7 +333,7 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 > Não é uma solução completa — mas entrega **valor imediato**.
 
 **O que muda no dia seguinte para o time comercial:**
-- A planilha morta de **10.000+ CNPJs** vira uma **fila priorizada e exportável**, com **classificação, score e próxima ação** por cliente.
+- A planilha morta de **70.000+ CNPJs** vira uma **fila priorizada e exportável**, com **classificação, score e próxima ação** por cliente.
 - O vendedor recebe **telefone, e-mail e ângulo de abordagem por segmento** prontos — menos garimpo, mais ligação.
 - A coordenação enxerga **capital em base inativa, oportunidades quentes e concentração por vendedor** em segundos.
 - Cadastros **baixados/inválidos** saem do caminho; **empresas reabertas** e **grupos econômicos** viram oportunidade de upsell.

@@ -58,7 +58,7 @@ proponha a correção.
    - Dependências do `mcp-server` (auditoria de versões conhecidas vulneráveis).
 
 3. **Performance**
-   - Comportamento com 10.000+ linhas: re-render da tabela, paginação, recálculo de scores.
+   - Comportamento com 70.000+ linhas: re-render da tabela, paginação, recálculo de scores.
    - Reflows/layout thrashing, listeners duplicados, vazamentos de memória.
    - Eficiência das consultas em lote à API (paralelismo vs. rate limit).
 

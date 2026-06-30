@@ -4,7 +4,7 @@
 
 ## 🎯 Problema
 
-Base com 10.000+ CNPJs cadastrados sem histórico de compras recente. O time comercial não sabe se essas empresas continuam ativas ou se os dados de contato estão corretos.
+Base com 70.000+ CNPJs cadastrados sem histórico de compras recente. O time comercial não sabe se essas empresas continuam ativas ou se os dados de contato estão corretos.
 
 ## 🚀 Solução
 
