@@ -14,7 +14,7 @@ Dashboard de Auditoria Cadastral e Reativação Comercial de CNPJs
 *Um MVP construído em 7 passos, com Vibe Coding*
 
 - **Equipe:** Daniel Roecker · Daniel Carrança (RM370526) · Henrique "Padawan" Gomes Pedroso (RM374303) · Thiago Bezerra · Fabio Correa · Vinicius Costa (JOYn)
-- **Stack:** HTML5 / CSS3 / JavaScript (Vanilla, zero frameworks no app) · Node.js · Model Context Protocol · Ollama/Qwen (LLM local)
+- **Stack:** HTML5 / CSS3 / JavaScript (Vanilla, zero frameworks no app) · Node.js · Model Context Protocol · Ollama/Gemma 4 (LLM local)
 - **Fonte de dados:** Receita Federal via BrasilAPI
 
 **Frase de abertura (mote):** *"Não programamos uma ferramenta. Nós a dirigimos — por intenção — e em poucas noites entregamos algo que normalmente levaria meses."*
@@ -204,7 +204,7 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 
 1. **Servidor MCP nativo** (`mcp-server/index.js`) — expõe a lógica de negócio como **3 ferramentas** para agentes externos (ex.: Claude Desktop): `validate_cnpj`, `fetch_cnpj_data` e `generate_audit_result` (pipeline completo). A lógica do app vira uma *capability* reutilizável por qualquer IA agêntica.
 
-2. **Assistente MCP local integrado** (`chat.html` + `mcp-bridge/`) — uma aba dedicada de **chat com IA rodando 100% na máquina**: um **LLM local via Ollama** (`qwen2.5-coder:7b`) conversa com a base através do protocolo MCP, intermediado por uma **ponte Express local**. Tudo client-side/local — nenhum dado vai para a nuvem.
+2. **Assistente MCP local integrado** (`chat.html` + `mcp-bridge/`) — uma aba dedicada de **chat com IA rodando 100% na máquina**: um **LLM local via Ollama** (`gemma4:12b-mlx`) conversa com a base através do protocolo MCP, intermediado por uma **ponte Express local**. Tudo client-side/local — nenhum dado vai para a nuvem.
    - **Console "MCP Inspector" de alta fidelidade** (UI prototipada no **Stitch**): três painéis com **splitters redimensionáveis** (sidebar 220–600px, rodapé de logs 64–450px).
    - **Terminal de logs em tempo real** (`USER_INPUT`, `API_CALL`, `MCP_CALL`, `REASONING`) com timestamps e latência em ms.
    - **Reasoning Core** — o bloco `[Raciocínio MCP]` é extraído e exibido em destaque, tornando o raciocínio da IA transparente.
@@ -228,7 +228,7 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 | **Gráficos** analíticos | **8** |
 | **Módulos de inferência** agregada | **10** |
 | **Ferramentas MCP** expostas a IA | **3** |
-| **Assistente MCP local** (chat + bridge Ollama/Qwen) | **1** |
+| **Assistente MCP local** (chat + bridge Ollama/Gemma 4) | **1** |
 | **Workers concorrentes** no batch | **3 (com delay de 300ms)** |
 | **Códigos CNAE** calibrados (+ 9 fallbacks por palavra-chave) | **19** |
 | **Formatos de export** (+ reimport de estado) | **3** (CSV/multi-sheet XLSX/JSON) |
@@ -289,7 +289,7 @@ A evolução **v1 → v2** do motor de scoring é o melhor exemplo de iteração
 10. **Persistência local robusta via IndexedDB** → salvamento automático de progresso, gráficos e dados mesmo após recarregamento da página.
 11. **Exportação dividida (XLSX)** contendo 100% das informações e inferências distribuídas em 4 abas estruturadas (Visão Geral, Carteira, Inteligência, Plano de Ação).
 12. **Servidor MCP nativo** carregando a lógica via **VM sandbox** — expõe a inteligência do app como 3 ferramentas para agentes de IA externos.
-13. **Assistente MCP local** (`chat.html` + bridge Express) com **LLM rodando na máquina** (Ollama/`qwen2.5-coder`): console "MCP Inspector" (UI Stitch) com **splitters redimensionáveis**, **logs de protocolo em tempo real**, **Reasoning Core** transparente, simulador de CPU e **diagnóstico de conectividade** por polling — IA conversando com a base sem sair do local.
+13. **Assistente MCP local** (`chat.html` + bridge Express) com **LLM rodando na máquina** (Ollama/`gemma4:12b-mlx`): console "MCP Inspector" (UI Stitch) com **splitters redimensionáveis**, **logs de protocolo em tempo real**, **Reasoning Core** transparente, simulador de CPU e **diagnóstico de conectividade** por polling — IA conversando com a base sem sair do local.
 14. **Future-proofing regulatório:** algoritmo de validação já compatível com o **CNPJ alfanumérico** (jul/2026), coberto por testes no `run_local.js`.
 15. **Arquitetura modular** (7 módulos client-side + namespaces) + **suíte de testes** + **350+ linhas de JSDoc** com justificativa de design.
 
@@ -396,7 +396,7 @@ Valor entregue
 - **Gate multiplicativo / não-compensatório** — fator que multiplica o score; um fator 0 zera, e bons componentes não "compram de volta" uma empresa baixada.
 - **Cohort de recência** — agrupamento por tempo desde a última compra.
 - **MCP (Model Context Protocol)** — protocolo que expõe ferramentas/capacidades para agentes de IA.
-- **Ollama / Qwen** — runtime de LLM local (modelo `qwen2.5-coder:7b`) que roda o assistente de chat na própria máquina, sem enviar dados à nuvem.
+- **Ollama / Gemma 4** — runtime de LLM local (modelo `gemma4:12b-mlx`) que roda o assistente de chat na própria máquina, sem enviar dados à nuvem.
 - **Bridge (ponte MCP)** — servidor Express local que liga o chat ao Ollama e ao servidor MCP, orquestrando as chamadas de ferramenta.
 - **Vibe Coding** — desenvolvimento guiado por intenção em linguagem natural, com a IA gerando e iterando o código.
 
