@@ -42,7 +42,7 @@ app.get('/api/status', async (req, res) => {
     bridge: true,
     ollama: false,
     mcp: false,
-    modelName: 'qwen2.5-coder:7b',
+    modelName: 'gemma4:12b-mlx',
     details: {}
   };
 
@@ -147,7 +147,7 @@ Ao gerar sua resposta final (após obter o resultado da ferramenta):
     
     // Primeira chamada pro Ollama
     const response = await ollama.chat({
-      model: 'qwen2.5-coder:7b',
+      model: 'gemma4:12b-mlx',
       messages: messages,
       tools: ollamaTools,
       options: {
@@ -209,7 +209,7 @@ Ao gerar sua resposta final (após obter o resultado da ferramenta):
       // Chamar Ollama novamente para gerar a resposta final
       console.log("Enviando resultados para o Ollama...");
       const finalResponse = await ollama.chat({
-        model: 'qwen2.5-coder:7b',
+        model: 'gemma4:12b-mlx',
         messages: messages,
         options: {
           num_ctx: 8192

@@ -97,7 +97,7 @@ Expõe toda a lógica pesada de negócio (validações matemáticas de CNPJ e a 
 ```
 
 ### 2. Assistente MCP Local Integrado (`chat.html` & `mcp-bridge/`)
-Criamos uma aba standalone e interativa para chat com IA. Ela se comunica com o **Ollama local** rodando o modelo `qwen2.5-coder:7b` (ou similar) e utiliza o protocolo MCP via uma ponte local (`mcp-bridge/`) para buscar dados do AuditBase em tempo real.
+Criamos uma aba standalone e interativa para chat com IA. Ela se comunica com o **Ollama local** rodando o modelo `gemma4:12b-mlx` (ou similar) e utiliza o protocolo MCP via uma ponte local (`mcp-bridge/`) para buscar dados do AuditBase em tempo real.
 - **Design UI de Alta Fidelidade (MCP Inspector):** O visual premium de console/inspetor hacker de alta tecnologia foi concebido e prototipado utilizando a ferramenta **Stitch** (stitch.withgoogle.com).
 - **Três Painéis com Splitters Dinâmicos (Redimensionamento):** Alças verticais (`#sidebar-resizer`) e horizontais (`#footer-resizer`) permitem redimensionar a barra lateral (220px a 600px) e o rodapé de logs (64px a 450px) dinamicamente via clique-e-arrasto. Os splitters contam com efeitos visuais e cursor interativo. Em dispositivos móveis, as alças de redimensionamento são ocultadas automaticamente e o painel lateral vira uma gaveta colapsável.
 - **Terminal de Logs de Atividade em Tempo Real:** Rodapé interativo com um feed contínuo que registra cada transação e evento do protocolo MCP (ex: `USER_INPUT`, `API_CALL`, `MCP_CALL`, `REASONING`), exibindo timestamps precisos, latência em ms e status de execução.
@@ -143,7 +143,7 @@ Para rodar a interface web, a ponte do assistente, a execução local do Ollama 
 1. **Pré-requisitos:** Certifique-se de ter o [Ollama](https://ollama.com/) instalado na máquina.
 2. **Modelo:** Baixe o modelo recomendado executando:
    ```bash
-   ollama pull qwen2.5-coder:7b
+   ollama pull gemma4:12b-mlx
    ```
 3. **Instalação:** Instale as dependências npm na raiz:
    ```bash
