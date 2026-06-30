@@ -6,7 +6,7 @@
     "start": "concurrently \"npm run serve\" \"npm run bridge\" \"npm run ollama\"",
     "serve": "python3 -m http.server 8000",
     "bridge": "cd mcp-bridge && node server.js",
-    "ollama": "./bin/ollama serve"
+    "ollama": "ollama serve 2>/dev/null || /Applications/Ollama.app/Contents/Resources/ollama serve"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

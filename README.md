@@ -140,7 +140,7 @@ Embora o **AuditBase** não tenha o objetivo de se tornar um CRM completo de mer
 ### Opção 1: Execução Completa da Stack Local (Recomendado)
 Para rodar a interface web, a ponte do assistente, a execução local do Ollama e o MCP server simultaneamente:
 
-1. **Pré-requisitos:** Certifique-se de ter o [Ollama](https://ollama.com/) instalado na máquina.
+1. **Pré-requisitos:** Tenha o [Ollama](https://ollama.com/) instalado e **atualizado** — o Gemma 4 exige uma versão recente do Ollama (o app indica quando há atualização). Garanta também o CLI `ollama` no PATH (no macOS, via Ollama.app → *Install command line tools*, ou `brew install ollama`).
 2. **Modelo:** Baixe o modelo recomendado executando:
    ```bash
    ollama pull gemma4:12b-mlx

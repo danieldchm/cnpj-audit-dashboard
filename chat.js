@@ -292,7 +292,7 @@ window.Chat = (function() {
     const inputField = document.getElementById('mcp-input');
     const message = inputField.value.trim();
     if (!message) return;
-    
+
     // Close mobile sidebar if open
     const sidebar = document.getElementById('chat-sidebar');
     const overlay = document.getElementById('sidebar-overlay');
@@ -301,73 +301,98 @@ window.Chat = (function() {
       sidebar.classList.remove('max-[1024px]:right-0');
       overlay.classList.add('hidden');
     }
-    
+
     // Hide welcome screen
     const welcome = document.getElementById('welcome-screen');
     if (welcome) welcome.style.display = 'none';
-    
+
     inputField.value = '';
     inputField.style.height = 'auto'; // Reset size
     inputField.disabled = true;
-    
+
     appendMessage('user', message);
-    showTyping();
-    
+
     // Append logs
     appendProtocolLog('USER_INPUT', `Prompt: "${message.substring(0, 45)}${message.length > 45 ? '...' : ''}"`, 'SUCCESS');
-    appendProtocolLog('API_CALL', 'POST /api/chat', 'RUNNING');
-    
+    appendProtocolLog('API_CALL', 'POST /api/chat (stream)', 'RUNNING');
+
     // Increase CPU Load to simulate generation
     setCpuLoad(Math.random() * 25 + 65); // 65-90% CPU usage
-    
+
     const startTime = Date.now();
-    
+    const cnpjRegex = /\d{2}\.?\d{3}\.?\d{3}\/?\d{4}\-?\d{2}/;
+    const matchedCnpj = message.match(cnpjRegex);
+
+    // Bolha do assistente em modo streaming (mostra o "thinking" ao vivo)
+    const stream = startAssistantStream();
+    let thinkingRaw = '';
+    let contentRaw = '';
+
+    const scroll = () => {
+      const b = document.getElementById('chat-body');
+      if (b) b.scrollTop = b.scrollHeight;
+    };
+
     try {
-      // Check if prompt references a CNPJ to log the tool execution
-      const cnpjRegex = /\d{2}\.?\d{3}\.?\d{3}\/?\d{4}\-?\d{2}/;
-      const matchedCnpj = message.match(cnpjRegex);
-      if (matchedCnpj) {
-        appendProtocolLog('MCP_CALL', `fetch_cnpj_data(${matchedCnpj[0]})`, 'PENDING');
-      }
-      
       const response = await fetch('http://localhost:3001/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: message,
-          history: chatHistory
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message, history: chatHistory })
       });
-      
-      const data = await response.json();
-      removeTyping();
-      
-      const latency = Date.now() - startTime;
-      appendProtocolLog('API_CALL', `POST /api/chat - Response received (${latency}ms)`, '200_OK');
-      
-      if (data.error) {
-        appendMessage('assistant', `⚠️ Erro: ${data.error}`);
-        appendProtocolLog('SYSTEM', `Inference failed: ${data.error}`, 'FAILED');
-      } else {
-        // If it was a CNPJ query, log completion
-        if (matchedCnpj) {
-          appendProtocolLog('MCP_CALL', `fetch_cnpj_data(${matchedCnpj[0]})`, 'COMPLETED');
-          // Update Latency in Receita stream
-          setReceitaLatency(Math.floor(latency * 0.45)); // Simulate Receita call takes ~45% of total time
+      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      // Lê o stream SSE: eventos separados por linha em branco, payload em "data:".
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let idx;
+        while ((idx = buffer.indexOf('\n\n')) >= 0) {
+          const rawEvent = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          const dataLine = rawEvent.split('\n').find(l => l.startsWith('data:'));
+          if (!dataLine) continue;
+
+          let evt;
+          try { evt = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
+
+          if (evt.type === 'thinking') {
+            thinkingRaw += evt.delta;
+            stream.setThinking(thinkingRaw);
+            updateSidebarReasoning(thinkingRaw);
+          } else if (evt.type === 'content') {
+            contentRaw += evt.delta;
+            stream.setContent(contentRaw);
+          } else if (evt.type === 'reset_content') {
+            // Descarta conteúdo parcial da fase 1 (ex.: texto de tool-call)
+            contentRaw = '';
+            stream.setContent('');
+          } else if (evt.type === 'tool') {
+            const st = evt.status === 'done' ? 'COMPLETED' : evt.status === 'error' ? 'FAILED' : 'RUNNING';
+            appendProtocolLog('MCP_CALL', `${evt.name}()`, st);
+          } else if (evt.type === 'error') {
+            stream.setContent(`⚠️ Erro: ${evt.message}`);
+            appendProtocolLog('SYSTEM', `Inference failed: ${evt.message}`, 'FAILED');
+          } else if (evt.type === 'done') {
+            if (evt.history) chatHistory = evt.history;
+          }
+          scroll();
         }
-        
-        appendMessage('assistant', data.content);
-        chatHistory = data.history;
-        
-        // Log final presentation completion
-        appendProtocolLog('SYSTEM', 'Resposta renderizada no histórico', 'SUCCESS');
       }
-      
+
+      const latency = Date.now() - startTime;
+      appendProtocolLog('API_CALL', `Stream concluído (${latency}ms)`, '200_OK');
+      if (matchedCnpj) setReceitaLatency(Math.floor(latency * 0.45));
+      stream.finalize();
+      appendProtocolLog('SYSTEM', 'Resposta renderizada no histórico', 'SUCCESS');
     } catch (err) {
-      removeTyping();
-      appendMessage('assistant', `⚠️ Erro de conexão com o Bridge: ${err.message}. Certifique-se que o comando npm start está rodando na raiz.`);
+      stream.setContent(`⚠️ Erro de conexão com o Bridge: ${err.message}. Certifique-se que o comando npm start está rodando na raiz.`);
+      stream.finalize();
       appendProtocolLog('SYSTEM', `Connection failed: ${err.message}`, 'ERROR');
     } finally {
       inputField.disabled = false;
@@ -375,6 +400,64 @@ window.Chat = (function() {
       // Reset CPU Load back to idle
       setCpuLoad(Math.random() * 1.5 + 0.8);
     }
+  }
+
+  // Cria a bolha do assistente em streaming e devolve handles de atualização ao vivo.
+  function startAssistantStream() {
+    const historyDiv = document.getElementById('mcp-chat-history');
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'flex justify-start mb-4';
+    rowDiv.innerHTML = `
+      <div class="max-w-[90%] flex items-start gap-md w-full">
+        <div class="w-8 h-8 rounded bg-surface-container-highest border border-outline-variant flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-primary text-[18px]" style="font-variation-settings: 'FILL' 1;">neurology</span>
+        </div>
+        <div class="bg-surface-container/80 backdrop-blur rounded-lg border-l-4 border-l-primary overflow-hidden border border-outline-variant shadow-2xl flex-1 p-md space-y-md select-text">
+          <details class="thinking-box space-y-xs" open style="display:none;">
+            <summary class="flex items-center gap-sm cursor-pointer">
+              <span class="thinking-label text-[10px] font-label-code text-primary animate-pulse-logic uppercase tracking-widest">Pensando…</span>
+            </summary>
+            <div class="thinking-content mt-sm p-sm bg-surface-container-low/40 rounded border border-outline-variant/30 text-on-surface-variant font-label-code text-[12px] leading-relaxed"></div>
+          </details>
+          <div class="assistant-content text-on-surface font-body-md leading-relaxed"></div>
+        </div>
+      </div>`;
+    historyDiv.appendChild(rowDiv);
+
+    const details = rowDiv.querySelector('.thinking-box');
+    const label = rowDiv.querySelector('.thinking-label');
+    const thinkingContent = rowDiv.querySelector('.thinking-content');
+    const contentEl = rowDiv.querySelector('.assistant-content');
+    let hadThinking = false;
+
+    return {
+      setThinking(raw) {
+        if (!raw) return;
+        hadThinking = true;
+        details.style.display = '';
+        thinkingContent.innerHTML = formatMarkdown(raw);
+      },
+      setContent(raw) {
+        contentEl.innerHTML = formatMarkdown(raw);
+      },
+      finalize() {
+        if (label) {
+          label.textContent = 'Raciocínio do modelo';
+          label.classList.remove('animate-pulse-logic');
+        }
+        if (!hadThinking && details) {
+          details.remove();
+        } else if (details) {
+          details.open = false; // colapsa o raciocínio, permanece expansível
+        }
+      }
+    };
+  }
+
+  // Atualiza o "Reasoning Core" da barra lateral ao vivo com o raciocínio do modelo.
+  function updateSidebarReasoning(raw) {
+    const el = document.getElementById('sidebar-reasoning');
+    if (el) el.innerHTML = `<span class="text-primary/50">&gt; ROOT_PROCESS:</span><br>${formatMarkdown(raw)}`;
   }
   
   function appendMessage(role, text) {
