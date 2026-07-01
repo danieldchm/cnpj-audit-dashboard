@@ -777,27 +777,7 @@ const Utils = (function () {
   /**
    * Wrapper de compatibilidade — a v1 exportava esta função sem defini-la,
    * o que lançava ReferenceError e quebrava o módulo inteiro no load.
-   * @param {Object} internalData
-   * @param {Object} officialData
-   * @param {Array} [divergences]
-   * @returns {string} 'ALTA' | 'MEDIA' | 'BAIXA' | 'DESCARTE'
-   */
-  function determinePriority(internalData, officialData, divergences) {
-    const div = divergences ?? generateDivergences(internalData, officialData);
-    return calculateVpaScore(internalData, officialData, div).priority;
-  }
 
-  /**
-   * Wrapper de compatibilidade (idem acima).
-   * @param {Object} internalData
-   * @param {Object} officialData
-   * @param {Array} [divergences]
-   * @returns {string} Ação recomendada.
-   */
-  function determineAction(internalData, officialData, divergences) {
-    const div = divergences ?? generateDivergences(internalData, officialData);
-    return calculateVpaScore(internalData, officialData, div).action;
-  }
 
   // ═══════════════════════════════════════════════
   // Resultado de auditoria
@@ -1664,8 +1644,6 @@ const Utils = (function () {
     calculateVpaScore,
     detectPorte,
     getCnaeAffinity,
-    determinePriority,
-    determineAction,
     generateAuditResult,
     // Reconstrução (round-trip Excel)
     parseCarteiraRow,
